@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
-import { truncateAddress } from '../../../lib/utils';
+import { truncateAddress, deriveSolanaAddress } from '../../../lib/utils';
 import { fetchApi } from '../../../lib/api';
 import {
   Building2,
@@ -243,47 +243,62 @@ export default function ProfilePage() {
             </div>
 
             {/* Solana SVM Wallet */}
-            <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-purple-400 uppercase flex items-center gap-1.5 font-mono">
-                  <Layers className="h-3.5 w-3.5" />
-                  Solana Devnet (SVM)
-                </span>
-                <span className="font-mono text-xs font-bold truncate max-w-[130px]">
-                  {userSolanaAddress ? truncateAddress(userSolanaAddress) : 'Generating...'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs flex-1"
-                  onClick={handleCopySol}
-                >
-                  {copiedSol ? (
-                    <>
-                      <Check className="mr-1 h-3 w-3 text-green-500" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="mr-1 h-3 w-3" />
-                      Copy Solana
-                    </>
-                  )}
-                </Button>
-                <a
-                  href={`https://explorer.solana.com/address/${userSolanaAddress}?cluster=devnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center h-7 px-2.5 text-xs rounded-md border hover:bg-muted text-muted-foreground hover:text-foreground"
-                >
-                  Explorer
-                  <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </div>
-            </div>
+            {(() => {
+              const activeSolAddress =
+                userSolanaAddress ||
+                solanaAddress ||
+                (walletAddress ? deriveSolanaAddress(walletAddress) : '');
+
+              return (
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-purple-400 uppercase flex items-center gap-1.5 font-mono">
+                      <Layers className="h-3.5 w-3.5" />
+                      Solana Devnet (SVM)
+                    </span>
+                    <span className="font-mono text-xs font-bold truncate max-w-[130px]">
+                      {activeSolAddress ? truncateAddress(activeSolAddress) : 'No Wallet Connected'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => {
+                        if (activeSolAddress) {
+                          navigator.clipboard.writeText(activeSolAddress);
+                          setCopiedSol(true);
+                          setTimeout(() => setCopiedSol(false), 2000);
+                        }
+                      }}
+                    >
+                      {copiedSol ? (
+                        <>
+                          <Check className="mr-1 h-3 w-3 text-green-500" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="mr-1 h-3 w-3" />
+                          Copy Solana
+                        </>
+                      )}
+                    </Button>
+                    <a
+                      href={`https://explorer.solana.com/address/${activeSolAddress}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center h-7 px-2.5 text-xs rounded-md border hover:bg-muted text-muted-foreground hover:text-foreground"
+                    >
+                      Explorer
+                      <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Line by Line Form */}
