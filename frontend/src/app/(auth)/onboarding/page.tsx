@@ -1,16 +1,30 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../hooks/useAuth';
+import { usePrivy } from '@privy-io/react-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
-import { Building2, GraduationCap, ArrowRight, Check, Sparkles, ShieldAlert, Lock } from 'lucide-react';
+import {
+  Building2,
+  GraduationCap,
+  ArrowRight,
+  Check,
+  Sparkles,
+  Lock,
+  Globe,
+  Mail,
+  User as UserIcon,
+  CheckCircle2,
+} from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, walletAddress } = useAuth();
+  const privy = usePrivy();
+  const ready = privy?.ready ?? false;
+  const authenticated = privy?.authenticated ?? false;
+  const user = privy?.user ?? null;
 
   const [selectedRole, setSelectedRole] = useState<'ISSUER' | 'STUDENT' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,49 +35,43 @@ export default function OnboardingPage() {
     academyName: '',
     slug: '',
     website: '',
-    contactEmail: user?.email?.address || '',
+    contactEmail: '',
     description: '',
   });
 
   // Student Form Data
   const [studentForm, setStudentForm] = useState({
-    fullName: user?.google?.name || user?.apple?.email || '',
+    fullName: '',
     headline: 'Web3 Learner & Developer',
     bio: '',
     linkedin: '',
   });
 
-  const handleRoleSelection = (role: 'ISSUER' | 'STUDENT') => {
+  // Pre-fill email/name if logged in
+  useEffect(() => {
+    if (authenticated && user) {
+      if (user.email?.address && !issuerForm.contactEmail) {
+        setIssuerForm((prev) => ({ ...prev, contactEmail: user.email?.address || '' }));
+      }
+      if ((user.google?.name || user.apple?.email) && !studentForm.fullName) {
+        setStudentForm((prev) => ({ ...prev, fullName: user.google?.name || '' }));
+      }
+    }
+  }, [authenticated, user]);
+
+  const handleRoleSelection = async (role: 'ISSUER' | 'STUDENT') => {
     setSelectedRole(role);
     setErrorMessage('');
-  };
 
-  const handleSkipStudent = async () => {
-    setIsSubmitting(true);
-    try {
-      await fetchApi('/auth/sync', {
-        method: 'POST',
-        body: JSON.stringify({
-          privyUserId: user?.id || 'temp_user_id',
-          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
-          role: 'STUDENT',
-          email: user?.email?.address,
-        }),
-      });
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xerty_user_role', 'STUDENT');
-        localStorage.setItem('xerty_onboarding_completed', 'true');
+    // If not authenticated, prompt login options immediately
+    if (!authenticated) {
+      try {
+        if (privy?.login) {
+          await privy.login();
+        }
+      } catch (err: any) {
+        console.warn('Privy login modal closed:', err?.message || err);
       }
-      router.push('/student');
-    } catch {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('xerty_user_role', 'STUDENT');
-        localStorage.setItem('xerty_onboarding_completed', 'true');
-      }
-      router.push('/student');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -77,12 +85,16 @@ export default function OnboardingPage() {
         issuerForm.slug ||
         issuerForm.academyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const userId = user?.id || 'temp_user_id';
+
       // 1. Sync role as ISSUER
       await fetchApi('/auth/sync', {
         method: 'POST',
         body: JSON.stringify({
-          privyUserId: user?.id || 'temp_user_id',
-          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          privyUserId: userId,
+          walletAddress: walletAddr,
+          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
           role: 'ISSUER',
           email: issuerForm.contactEmail || user?.email?.address,
         }),
@@ -92,19 +104,18 @@ export default function OnboardingPage() {
       await fetchApi('/issuers/profile', {
         method: 'POST',
         body: JSON.stringify({
-          userId: user?.id || 'temp_user_id',
+          userId: userId,
           academyName: issuerForm.academyName,
           slug: generatedSlug,
-          onchainIssuerAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          onchainIssuerAddress: walletAddr,
           organizationInfo: {
             description: issuerForm.description,
             website: issuerForm.website,
-            contactEmail: issuerForm.contactEmail,
+            contactEmail: issuerForm.contactEmail || user?.email?.address,
           },
         }),
       });
 
-      // 3. Save role locally & route strictly to /issuer
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'ISSUER');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -129,12 +140,16 @@ export default function OnboardingPage() {
     setErrorMessage('');
 
     try {
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const userId = user?.id || 'temp_user_id';
+
       // 1. Sync role as STUDENT
       await fetchApi('/auth/sync', {
         method: 'POST',
         body: JSON.stringify({
-          privyUserId: user?.id || 'temp_user_id',
-          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          privyUserId: userId,
+          walletAddress: walletAddr,
+          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
           role: 'STUDENT',
           email: user?.email?.address,
           fullName: studentForm.fullName,
@@ -145,7 +160,7 @@ export default function OnboardingPage() {
       await fetchApi('/students/profile', {
         method: 'POST',
         body: JSON.stringify({
-          userId: user?.id || 'temp_user_id',
+          userId: userId,
           fullName: studentForm.fullName,
           headline: studentForm.headline,
           bio: studentForm.bio,
@@ -155,7 +170,6 @@ export default function OnboardingPage() {
         }),
       });
 
-      // 3. Save role locally & route strictly to /student
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'STUDENT');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -182,9 +196,19 @@ export default function OnboardingPage() {
           <Sparkles className="h-3.5 w-3.5" />
           Welcome to Xerty
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Select Permanent Account Type</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {!selectedRole
+            ? 'Select Account Type'
+            : !authenticated
+            ? 'Sign In to Proceed'
+            : selectedRole === 'ISSUER'
+            ? 'Complete Institution Account Information'
+            : 'Complete Student Account Information'}
+        </h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Please choose your account type carefully. Your account permissions are locked to your choice.
+          {!selectedRole && 'Select whether you are issuing academic credentials or receiving certificates.'}
+          {selectedRole && !authenticated && 'Choose your login method (Web3 wallet, Email, or Social account).'}
+          {selectedRole && authenticated && 'Fill in your profile details to complete account creation.'}
         </p>
       </div>
 
@@ -233,7 +257,7 @@ export default function OnboardingPage() {
                 </li>
               </ul>
               <Button className="w-full mt-2" variant="default">
-                Register as Issuer
+                Select Issuer & Sign In
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardContent>
@@ -282,20 +306,8 @@ export default function OnboardingPage() {
               </ul>
               <div className="space-y-2 pt-2">
                 <Button className="w-full" variant="outline">
-                  Register as Student
+                  Select Student & Sign In
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSkipStudent();
-                  }}
-                  className="w-full text-xs text-muted-foreground hover:text-foreground"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isSubmitting}
-                >
-                  Quick Setup & Go to Vault →
                 </Button>
               </div>
             </CardContent>
@@ -303,25 +315,49 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* Step 2: Form for Issuer */}
-      {selectedRole === 'ISSUER' && (
+      {/* Step 2 Prompt: If role selected but not logged in */}
+      {selectedRole && !authenticated && (
+        <Card className="max-w-md mx-auto text-center p-6 space-y-4 border-2">
+          <div className="space-y-2">
+            <h3 className="font-bold text-lg">Sign In to Continue</h3>
+            <p className="text-xs text-muted-foreground">
+              Please authenticate to set up your {selectedRole === 'ISSUER' ? 'Institution' : 'Student'} account.
+            </p>
+          </div>
+          <Button onClick={() => privy?.login()} className="w-full">
+            Choose Login Option →
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedRole(null)} className="text-xs">
+            ← Change Role
+          </Button>
+        </Card>
+      )}
+
+      {/* Step 3: Form for Issuer (After Login Initialized) */}
+      {selectedRole === 'ISSUER' && authenticated && (
         <Card className="max-w-xl mx-auto border-2 border-primary/40">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium bg-green-500/10 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="h-3 w-3" /> Authenticated
+                  </span>
+                </div>
                 <CardTitle className="text-lg">Institution Account Setup</CardTitle>
                 <CardDescription>Enter details about your academy or organization.</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedRole(null)}>
-                Change
+                Change Role
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleIssuerSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">
-                  Academy / Organization Name
+                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                  Academy / Organization Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   required
@@ -341,7 +377,9 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Public Handle / Slug</label>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">
+                    Public Handle / Slug <span className="text-destructive">*</span>
+                  </label>
                   <input
                     required
                     type="text"
@@ -352,7 +390,9 @@ export default function OnboardingPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground">Official Website</label>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Globe className="h-3.5 w-3.5 text-primary" /> Official Website
+                  </label>
                   <input
                     type="url"
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
@@ -364,7 +404,10 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">Official Contact Email</label>
+                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <Mail className="h-3.5 w-3.5 text-primary" />
+                  Official Contact Email <span className="text-destructive">*</span>
+                </label>
                 <input
                   required
                   type="email"
@@ -389,9 +432,8 @@ export default function OnboardingPage() {
               {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
 
               <div className="pt-2">
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating Issuer Profile...' : 'Confirm & Register as Issuer'}
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button type="submit" className="w-full font-bold h-11" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving & Creating Profile...' : 'Save & Complete Issuer Account Creation →'}
                 </Button>
               </div>
             </form>
@@ -399,24 +441,32 @@ export default function OnboardingPage() {
         </Card>
       )}
 
-      {/* Step 2: Form for Student */}
-      {selectedRole === 'STUDENT' && (
+      {/* Step 3: Form for Student (After Login Initialized) */}
+      {selectedRole === 'STUDENT' && authenticated && (
         <Card className="max-w-xl mx-auto border-2 border-emerald-500/40">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="flex items-center gap-1 text-[11px] text-green-500 font-medium bg-green-500/10 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="h-3 w-3" /> Authenticated
+                  </span>
+                </div>
                 <CardTitle className="text-lg">Student Profile Setup</CardTitle>
                 <CardDescription>Personalize your recipient portfolio.</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedRole(null)}>
-                Change
+                Change Role
               </Button>
             </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleStudentSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">Full Legal Name</label>
+                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
+                  Full Legal Name <span className="text-destructive">*</span>
+                </label>
                 <input
                   required
                   type="text"
@@ -439,7 +489,10 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">LinkedIn Profile URL</label>
+                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                  <Globe className="h-3.5 w-3.5 text-emerald-500" />
+                  LinkedIn Profile URL
+                </label>
                 <input
                   type="url"
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
@@ -462,19 +515,13 @@ export default function OnboardingPage() {
 
               {errorMessage && <p className="text-xs text-destructive">{errorMessage}</p>}
 
-              <div className="flex items-center justify-between pt-2 gap-3">
+              <div className="pt-2">
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSkipStudent}
+                  type="submit"
+                  className="w-full font-bold h-11 bg-emerald-600 hover:bg-emerald-700 text-white"
                   disabled={isSubmitting}
                 >
-                  Skip Customization
-                </Button>
-                <Button type="submit" size="sm" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Confirm & Register as Student'}
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  {isSubmitting ? 'Saving & Finalizing...' : 'Save & Complete Student Account Creation →'}
                 </Button>
               </div>
             </form>

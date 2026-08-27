@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePrivy } from '@privy-io/react-auth';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { fetchApi } from '../../lib/api';
 import {
   Building2,
@@ -13,14 +12,13 @@ import {
   ArrowLeft,
   Check,
   Sparkles,
-  ShieldAlert,
   Lock,
   X,
   Globe,
   Mail,
-  User,
-  ShieldCheck,
-  ExternalLink,
+  User as UserIcon,
+  Wallet,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -32,10 +30,11 @@ interface AuthModalProps {
 export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProps) {
   const router = useRouter();
   const privy = usePrivy();
+  const ready = privy?.ready ?? false;
+  const authenticated = privy?.authenticated ?? false;
+  const user = privy?.user ?? null;
 
-  const [step, setStep] = useState<'SELECT_ROLE' | 'ISSUER_FORM' | 'STUDENT_FORM'>(
-    defaultRole === 'ISSUER' ? 'ISSUER_FORM' : defaultRole === 'STUDENT' ? 'STUDENT_FORM' : 'SELECT_ROLE'
-  );
+  const [selectedRole, setSelectedRole] = useState<'ISSUER' | 'STUDENT' | null>(defaultRole);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -56,29 +55,53 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
     linkedin: '',
   });
 
+  // Pre-fill email or name if Privy authenticated
+  useEffect(() => {
+    if (authenticated && user) {
+      if (user.email?.address && !issuerForm.contactEmail) {
+        setIssuerForm((prev) => ({ ...prev, contactEmail: user.email?.address || '' }));
+      }
+      if ((user.google?.name || user.apple?.email) && !studentForm.fullName) {
+        setStudentForm((prev) => ({ ...prev, fullName: user.google?.name || '' }));
+      }
+    }
+  }, [authenticated, user]);
+
   if (!isOpen) return null;
 
-  const handleSelectRole = (role: 'ISSUER' | 'STUDENT') => {
+  // Step 1: User selects role -> Trigger Privy Login options
+  const handleSelectRole = async (role: 'ISSUER' | 'STUDENT') => {
+    setSelectedRole(role);
     setErrorMessage('');
-    if (role === 'ISSUER') {
-      setStep('ISSUER_FORM');
-    } else {
-      setStep('STUDENT_FORM');
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('xerty_selected_role', role);
+    }
+
+    // If not yet authenticated, launch Privy login immediately
+    if (!authenticated) {
+      try {
+        if (privy?.login) {
+          await privy.login();
+        }
+      } catch (err: any) {
+        console.warn('Privy login popup closed or failed:', err?.message || err);
+      }
     }
   };
 
-  const handleQuickLogin = async () => {
+  const handleQuickSignIn = async () => {
     try {
-      onClose();
       if (privy?.login) {
         await privy.login();
       }
     } catch (err: any) {
-      console.warn('Quick login notice:', err?.message || err);
+      console.warn('Quick sign-in error:', err);
     }
   };
 
-  const handleIssuerSubmitAndConnect = async (e: React.FormEvent) => {
+  // Step 3: User fills account information & completes account creation
+  const handleCompleteIssuerAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
@@ -88,66 +111,126 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         issuerForm.slug ||
         issuerForm.academyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-      // Store pending registration info in localStorage for after Privy connects
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const userId = user?.id || 'temp_user_id';
+
+      // 1. Sync User with MongoDB as ISSUER
+      await fetchApi('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          privyUserId: userId,
+          walletAddress: walletAddr,
+          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
+          email: issuerForm.contactEmail || user?.email?.address,
+          role: 'ISSUER',
+        }),
+      });
+
+      // 2. Save Issuer Profile in MongoDB
+      await fetchApi('/issuers/profile', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: userId,
+          academyName: issuerForm.academyName,
+          slug: generatedSlug,
+          onchainIssuerAddress: walletAddr,
+          organizationInfo: {
+            description: issuerForm.description,
+            website: issuerForm.website,
+            contactEmail: issuerForm.contactEmail || user?.email?.address,
+          },
+        }),
+      });
+
       if (typeof window !== 'undefined') {
-        localStorage.setItem('xerty_pending_role', 'ISSUER');
-        localStorage.setItem(
-          'xerty_pending_issuer_data',
-          JSON.stringify({
-            ...issuerForm,
-            slug: generatedSlug,
-          })
-        );
         localStorage.setItem('xerty_user_role', 'ISSUER');
         localStorage.setItem('xerty_onboarding_completed', 'true');
+        localStorage.removeItem('xerty_selected_role');
       }
 
       onClose();
-
-      // Launch Privy login / signup modal
-      if (privy?.login) {
-        await privy.login();
-      }
+      router.push('/issuer');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to initialize issuer registration');
+      console.error('Failed to complete issuer registration:', err);
+      // Fallback
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xerty_user_role', 'ISSUER');
+        localStorage.setItem('xerty_onboarding_completed', 'true');
+      }
+      onClose();
+      router.push('/issuer');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleStudentSubmitAndConnect = async (e: React.FormEvent) => {
+  const handleCompleteStudentAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
 
     try {
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const userId = user?.id || 'temp_user_id';
+
+      // 1. Sync User with MongoDB as STUDENT
+      await fetchApi('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          privyUserId: userId,
+          walletAddress: walletAddr,
+          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
+          email: user?.email?.address,
+          fullName: studentForm.fullName,
+          role: 'STUDENT',
+        }),
+      });
+
+      // 2. Save Student Profile in MongoDB
+      await fetchApi('/students/profile', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: userId,
+          fullName: studentForm.fullName,
+          headline: studentForm.headline,
+          bio: studentForm.bio,
+          socialLinks: {
+            linkedin: studentForm.linkedin,
+          },
+        }),
+      });
+
       if (typeof window !== 'undefined') {
-        localStorage.setItem('xerty_pending_role', 'STUDENT');
-        localStorage.setItem(
-          'xerty_pending_student_data',
-          JSON.stringify({
-            ...studentForm,
-          })
-        );
         localStorage.setItem('xerty_user_role', 'STUDENT');
         localStorage.setItem('xerty_onboarding_completed', 'true');
+        localStorage.removeItem('xerty_selected_role');
       }
 
       onClose();
-
-      // Launch Privy login / signup modal
-      if (privy?.login) {
-        await privy.login();
-      }
+      router.push('/student');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to initialize student registration');
+      console.error('Failed to complete student registration:', err);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xerty_user_role', 'STUDENT');
+        localStorage.setItem('xerty_onboarding_completed', 'true');
+      }
+      onClose();
+      router.push('/student');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Check which step to render:
+  // Step A: Not selected a role yet -> Role Cards
+  // Step B: Role selected but not logged in -> Prompt to connect
+  // Step C: Role selected AND logged in -> Fill Information Form
+  const showRoleSelection = !selectedRole;
+  const showLoginPrompt = selectedRole && !authenticated;
+  const showInfoForm = selectedRole && authenticated;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200 overflow-y-auto">
       <div
         className="relative w-full max-w-4xl rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-2xl text-card-foreground my-8 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -160,31 +243,33 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
           <X className="h-5 w-5" />
         </button>
 
-        {/* Modal Top Header */}
+        {/* Top Header */}
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
             <Sparkles className="h-3.5 w-3.5" />
             Xerty Web3 Platform Access
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            {step === 'SELECT_ROLE' && 'Choose Your Permanent Account Type'}
-            {step === 'ISSUER_FORM' && 'Register Educational Institution Account'}
-            {step === 'STUDENT_FORM' && 'Register Student & Learner Account'}
+            {showRoleSelection && 'Select Your Account Type'}
+            {showLoginPrompt && `Sign In to Continue as ${selectedRole === 'ISSUER' ? 'Institution' : 'Student'}`}
+            {showInfoForm &&
+              (selectedRole === 'ISSUER'
+                ? 'Complete Institution Account Information'
+                : 'Complete Student Account Information')}
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
-            {step === 'SELECT_ROLE' &&
-              'Select whether you are issuing academic credentials or receiving certificates.'}
-            {step === 'ISSUER_FORM' &&
-              'Fill in your academy information. Once created, you will be taken to the Issuer Studio.'}
-            {step === 'STUDENT_FORM' &&
-              'Set up your student portfolio. Once created, you will be taken to your Student Vault.'}
+            {showRoleSelection &&
+              'Choose whether you are issuing academic credentials or receiving certificates.'}
+            {showLoginPrompt && 'Connect with your Web3 wallet, Email, or Social account.'}
+            {showInfoForm &&
+              'Fill in your profile details to finalize your account and access your dashboard.'}
           </p>
         </div>
 
         {/* ========================================================================= */}
-        {/* STEP 1: ROLE SELECTION CARDS (2 COLUMNS)                                   */}
+        {/* STEP 1: ROLE SELECTION CARDS                                              */}
         {/* ========================================================================= */}
-        {step === 'SELECT_ROLE' && (
+        {showRoleSelection && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* CARD 1: ISSUER */}
@@ -232,7 +317,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
 
                 <div className="pt-6">
                   <Button className="w-full font-bold shadow-md" size="default">
-                    Register as Institution / Issuer
+                    Select Issuer & Sign In
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
@@ -282,46 +367,83 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
                 </div>
 
                 <div className="pt-6">
-                  <Button className="w-full font-bold border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10" variant="outline" size="default">
-                    Register as Student
+                  <Button
+                    className="w-full font-bold border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                    variant="outline"
+                    size="default"
+                  >
+                    Select Student & Sign In
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Quick Login Footer for Returning Users */}
+            {/* Quick Login Footer */}
             <div className="text-center pt-2 border-t">
               <button
                 type="button"
-                onClick={handleQuickLogin}
+                onClick={handleQuickSignIn}
                 className="text-xs text-muted-foreground hover:text-foreground font-semibold inline-flex items-center gap-1.5 transition-colors"
               >
-                Already have an account? <span className="text-primary underline">Quick Sign In with Wallet / Email →</span>
+                Already registered? <span className="text-primary underline">Sign In with Wallet / Email →</span>
               </button>
             </div>
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2A: ISSUER REGISTRATION FORM                                         */}
+        {/* STEP 2: PROMPT LOGIN (IF POPUP WAS CLOSED)                                */}
         {/* ========================================================================= */}
-        {step === 'ISSUER_FORM' && (
+        {showLoginPrompt && (
+          <div className="max-w-md mx-auto text-center space-y-6 py-6">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center">
+              <Wallet className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold">
+                Initialize Login for {selectedRole === 'ISSUER' ? 'Issuer' : 'Student'} Account
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Click below to select your login method (Web3 Wallet, Google, Apple, or Email).
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button onClick={() => privy?.login()} className="w-full h-11 font-bold shadow-md">
+                Select Login Option & Authenticate →
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedRole(null)}
+                className="text-xs text-muted-foreground"
+              >
+                ← Change Selected Role
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STEP 3A: ISSUER INFORMATION FORM (AFTER LOGIN INITIALIZED)                */}
+        {/* ========================================================================= */}
+        {showInfoForm && selectedRole === 'ISSUER' && (
           <div className="max-w-xl mx-auto space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
-              <button
-                type="button"
-                onClick={() => setStep('SELECT_ROLE')}
-                className="inline-flex items-center text-xs font-semibold text-muted-foreground hover:text-foreground gap-1"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Role Selection
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs text-green-500 font-medium bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated
+                </span>
+                <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                  {user?.wallet?.address ? `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : user?.email?.address}
+                </span>
+              </div>
               <span className="text-xs font-bold text-primary flex items-center gap-1.5 font-mono">
-                <Building2 className="h-3.5 w-3.5" /> Issuer Portal Setup
+                <Building2 className="h-3.5 w-3.5" /> Issuer Profile
               </span>
             </div>
 
-            <form onSubmit={handleIssuerSubmitAndConnect} className="space-y-4">
+            <form onSubmit={handleCompleteIssuerAccount} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 text-primary" />
@@ -388,12 +510,12 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground">
-                  Organization Bio / Curriculum Overview
+                  Organization Bio / Description
                 </label>
                 <textarea
                   rows={2}
                   className="w-full rounded-lg border bg-background px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Describe your certification programs, university accreditation, or courses..."
+                  placeholder="Describe your certification programs..."
                   value={issuerForm.description}
                   onChange={(e) => setIssuerForm({ ...issuerForm, description: e.target.value })}
                 />
@@ -403,7 +525,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
 
               <div className="pt-2">
                 <Button type="submit" className="w-full font-bold h-11 text-sm shadow-lg" disabled={isSubmitting}>
-                  {isSubmitting ? 'Initializing Account...' : 'Continue to Connect Wallet & Create Issuer Account →'}
+                  {isSubmitting ? 'Saving & Finalizing...' : 'Save & Complete Issuer Account Creation →'}
                 </Button>
               </div>
             </form>
@@ -411,27 +533,28 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2B: STUDENT REGISTRATION FORM                                         */}
+        {/* STEP 3B: STUDENT INFORMATION FORM (AFTER LOGIN INITIALIZED)               */}
         {/* ========================================================================= */}
-        {step === 'STUDENT_FORM' && (
+        {showInfoForm && selectedRole === 'STUDENT' && (
           <div className="max-w-xl mx-auto space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
-              <button
-                type="button"
-                onClick={() => setStep('SELECT_ROLE')}
-                className="inline-flex items-center text-xs font-semibold text-muted-foreground hover:text-foreground gap-1"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Role Selection
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs text-green-500 font-medium bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Authenticated
+                </span>
+                <span className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+                  {user?.wallet?.address ? `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : user?.email?.address}
+                </span>
+              </div>
               <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5 font-mono">
-                <GraduationCap className="h-3.5 w-3.5" /> Student Vault Setup
+                <GraduationCap className="h-3.5 w-3.5" /> Student Vault Profile
               </span>
             </div>
 
-            <form onSubmit={handleStudentSubmitAndConnect} className="space-y-4">
+            <form onSubmit={handleCompleteStudentAccount} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-emerald-500" />
+                  <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
                   Full Legal Name <span className="text-destructive">*</span>
                 </label>
                 <input
@@ -451,7 +574,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
                 <input
                   type="text"
                   className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="e.g. Full-Stack Web3 Developer & Researcher"
+                  placeholder="e.g. Full-Stack Web3 Developer"
                   value={studentForm.headline}
                   onChange={(e) => setStudentForm({ ...studentForm, headline: e.target.value })}
                 />
@@ -492,7 +615,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
                   className="w-full font-bold h-11 text-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Initializing Account...' : 'Continue to Connect Wallet & Create Student Account →'}
+                  {isSubmitting ? 'Saving & Finalizing...' : 'Save & Complete Student Account Creation →'}
                 </Button>
               </div>
             </form>
