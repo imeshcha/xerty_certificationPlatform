@@ -66,7 +66,6 @@ export class UsersService {
       .exec();
 
     if (existing) {
-      // Ensure solanaAddress is attached
       if (!existing.solanaAddress) {
         existing.solanaAddress = solanaAddress;
       }
@@ -75,23 +74,83 @@ export class UsersService {
       if (userData.privyUserId) existing.privyUserId = userData.privyUserId;
       if (walletAddress) existing.walletAddress = walletAddress.toLowerCase();
 
-      // If user provided a specific role and the existing role is not locked yet, lock it
-      if (userData.role && !existing.isRoleLocked) {
-        existing.role = userData.role;
-        existing.isRoleLocked = true;
-      }
-
       return existing.save();
     }
 
-    // New user with both EVM and Solana addresses
+    // New user initial sync (UNASSIGNED role by default until registration form is completed)
     return this.userModel.create({
       ...userData,
       walletAddress: walletAddress?.toLowerCase(),
       solanaAddress,
-      role: userData.role || UserRole.STUDENT,
-      isRoleLocked: !!userData.role,
+      role: userData.role || UserRole.UNASSIGNED,
+      isRoleLocked: false,
+      isProfileComplete: false,
     });
+  }
+
+  async completeRegistration(payload: {
+    userId?: string;
+    walletAddress?: string;
+    privyUserId?: string;
+    role: UserRole;
+    email?: string;
+    fullName?: string;
+    issuerProfile?: any;
+    studentProfile?: any;
+  }): Promise<UserDocument> {
+    const { userId, walletAddress, privyUserId, role, email, fullName, issuerProfile, studentProfile } = payload;
+
+    const query: any = {
+      $or: [],
+    };
+    if (userId) query.$or.push({ _id: userId });
+    if (privyUserId) query.$or.push({ privyUserId });
+    if (walletAddress) query.$or.push({ walletAddress: walletAddress.toLowerCase() });
+
+    if (query.$or.length === 0) {
+      query.$or.push({ walletAddress: '0x0' });
+    }
+
+    let user = await this.userModel.findOne(query).exec();
+
+    if (user && user.isRoleLocked && user.role !== UserRole.UNASSIGNED && user.role !== role) {
+      throw new ForbiddenException(
+        `Strict Access Policy: An account registered as ${user.role} cannot create or access a ${role} account.`
+      );
+    }
+
+    const solanaAddress =
+      user?.solanaAddress ||
+      this.generateSolanaAddress(walletAddress || privyUserId || user?.walletAddress || 'default_seed');
+
+    const updateDoc: any = {
+      role,
+      isRoleLocked: true,
+      isProfileComplete: true,
+      solanaAddress,
+    };
+
+    if (email) updateDoc.email = email;
+    if (fullName) updateDoc.fullName = fullName;
+    if (privyUserId) updateDoc.privyUserId = privyUserId;
+    if (walletAddress) updateDoc.walletAddress = walletAddress.toLowerCase();
+
+    if (role === UserRole.ISSUER && issuerProfile) {
+      updateDoc.issuerProfile = {
+        ...issuerProfile,
+        isVerified: false,
+      };
+    } else if (role === UserRole.STUDENT && studentProfile) {
+      updateDoc.studentProfile = studentProfile;
+      if (studentProfile.fullName) updateDoc.fullName = studentProfile.fullName;
+    }
+
+    if (user) {
+      Object.assign(user, updateDoc);
+      return user.save();
+    }
+
+    return this.userModel.create(updateDoc);
   }
 
   async updateIssuerProfile(
@@ -125,6 +184,7 @@ export class UsersService {
           $set: {
             role: UserRole.ISSUER,
             isRoleLocked: true,
+            isProfileComplete: true,
             issuerProfile: {
               ...profileData,
               isVerified: false,
@@ -169,6 +229,7 @@ export class UsersService {
     const updatePayload: any = {
       role: UserRole.STUDENT,
       isRoleLocked: true,
+      isProfileComplete: true,
       studentProfile: profileData,
     };
     if (profileData.fullName) {

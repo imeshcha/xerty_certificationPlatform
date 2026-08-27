@@ -7,6 +7,7 @@ export enum UserRole {
   STUDENT = 'STUDENT',
   ISSUER = 'ISSUER',
   ADMIN = 'ADMIN',
+  UNASSIGNED = 'UNASSIGNED',
 }
 
 export enum AuthProvider {
@@ -81,11 +82,14 @@ export class User {
   @Prop({ required: true, unique: true, index: true })
   privyUserId: string;
 
-  @Prop({ required: true, enum: UserRole, default: UserRole.STUDENT, index: true })
+  @Prop({ required: true, enum: UserRole, default: UserRole.UNASSIGNED, index: true })
   role: string;
 
   @Prop({ default: false })
   isRoleLocked: boolean;
+
+  @Prop({ default: false })
+  isProfileComplete: boolean;
 
   @Prop({ trim: true })
   fullName?: string;

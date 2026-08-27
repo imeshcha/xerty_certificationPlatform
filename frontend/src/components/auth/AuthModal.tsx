@@ -114,30 +114,20 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
-      // 1. Sync User with MongoDB as ISSUER
-      await fetchApi('/auth/sync', {
+      // Call dedicated complete-registration API
+      await fetchApi('/auth/complete-registration', {
         method: 'POST',
         body: JSON.stringify({
           privyUserId: userId,
           walletAddress: walletAddr,
-          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
-          email: issuerForm.contactEmail || user?.email?.address,
           role: 'ISSUER',
-        }),
-      });
-
-      // 2. Save Issuer Profile in MongoDB
-      await fetchApi('/issuers/profile', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: userId,
-          academyName: issuerForm.academyName,
-          slug: generatedSlug,
-          onchainIssuerAddress: walletAddr,
-          organizationInfo: {
-            description: issuerForm.description,
+          email: issuerForm.contactEmail || user?.email?.address,
+          issuerProfile: {
+            academyName: issuerForm.academyName,
+            slug: generatedSlug,
             website: issuerForm.website,
             contactEmail: issuerForm.contactEmail || user?.email?.address,
+            description: issuerForm.description,
           },
         }),
       });
@@ -152,7 +142,6 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       router.push('/issuer');
     } catch (err: any) {
       console.error('Failed to complete issuer registration:', err);
-      // Fallback
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'ISSUER');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -173,28 +162,19 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
-      // 1. Sync User with MongoDB as STUDENT
-      await fetchApi('/auth/sync', {
+      // Call dedicated complete-registration API
+      await fetchApi('/auth/complete-registration', {
         method: 'POST',
         body: JSON.stringify({
           privyUserId: userId,
           walletAddress: walletAddr,
-          authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
+          role: 'STUDENT',
           email: user?.email?.address,
           fullName: studentForm.fullName,
-          role: 'STUDENT',
-        }),
-      });
-
-      // 2. Save Student Profile in MongoDB
-      await fetchApi('/students/profile', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: userId,
-          fullName: studentForm.fullName,
-          headline: studentForm.headline,
-          bio: studentForm.bio,
-          socialLinks: {
+          studentProfile: {
+            fullName: studentForm.fullName,
+            headline: studentForm.headline,
+            bio: studentForm.bio,
             linkedin: studentForm.linkedin,
           },
         }),
