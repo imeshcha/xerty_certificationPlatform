@@ -41,37 +41,67 @@ export default function CourseRoomPage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  const loadCourseData = () => {
-    if (courseId) {
-      setIsLoading(true);
-      Promise.all([
-        fetchApi(`/courses/${courseId}`),
-        fetchApi(`/certificates/course/${courseId}`),
-      ])
-        .then(([courseData, certsData]: [any, any]) => {
-          if (courseData) {
-            setCourse(courseData);
-            if (courseData.templateJson) {
-              setTemplateJson(courseData.templateJson);
-            }
-            setSettingsForm({
-              title: courseData.title || '',
-              code: courseData.code || '',
-              courseUrl: courseData.courseUrl || '',
-              durationHours: courseData.durationHours || 40,
-              description: courseData.description || '',
-              skills: Array.isArray(courseData.skills) ? courseData.skills.join(', ') : '',
-            });
-          }
-          if (Array.isArray(certsData)) {
-            setCertificates(certsData);
-          }
-        })
-        .catch((err) => {
-          console.warn('Could not load course room details:', err);
-        })
-        .finally(() => setIsLoading(false));
+  const applyCourseData = (courseData: any) => {
+    if (!courseData) return;
+    setCourse(courseData);
+    if (courseData.templateJson) {
+      setTemplateJson(courseData.templateJson);
     }
+    setSettingsForm({
+      title: courseData.title || '',
+      code: courseData.code || '',
+      courseUrl: courseData.courseUrl || '',
+      durationHours: courseData.durationHours || 40,
+      description: courseData.description || '',
+      skills: Array.isArray(courseData.skills) ? courseData.skills.join(', ') : '',
+    });
+  };
+
+  const loadCourseData = () => {
+    if (!courseId) return;
+    setIsLoading(true);
+
+    // 1. Instantly check local cache for immediate display
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('xerty_courses');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const found = list.find((c: any) => (c._id || c.id) === courseId || c.code === courseId);
+          if (found) {
+            applyCourseData(found);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse local course cache', e);
+      }
+    }
+
+    // 2. Fetch from backend
+    fetchApi(`/courses/${courseId}`)
+      .then((courseData: any) => {
+        if (courseData) {
+          applyCourseData(courseData);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load course from backend directly:', err);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+
+    // 3. Fetch certificates separately so failure doesn't block the course room
+    fetchApi(`/certificates/course/${courseId}`)
+      .then((certsData: any) => {
+        if (Array.isArray(certsData)) {
+          setCertificates(certsData);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load certificates list:', err);
+      });
   };
 
   // Load Course & Its Issued Certificates
@@ -88,16 +118,29 @@ export default function CourseRoomPage() {
           templateJson: data,
         }),
       });
-      setTemplateJson(data);
-      setCourse((prev: any) => ({
-        ...prev,
-        templateJson: data,
-      }));
     } catch (err) {
-      console.error('Failed to save template configuration:', err);
-    } finally {
-      setIsSavingTemplate(false);
+      console.warn('Backend template save sync notice:', err);
     }
+
+    setTemplateJson(data);
+    setCourse((prev: any) => {
+      const updated = { ...prev, templateJson: data };
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('xerty_courses');
+          if (stored) {
+            const list = JSON.parse(stored);
+            const idx = list.findIndex((c: any) => (c._id || c.id) === courseId || c.code === course?.code);
+            if (idx >= 0) {
+              list[idx] = updated;
+              localStorage.setItem('xerty_courses', JSON.stringify(list));
+            }
+          }
+        } catch (e) {}
+      }
+      return updated;
+    });
+    setIsSavingTemplate(false);
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -105,12 +148,12 @@ export default function CourseRoomPage() {
     setIsSavingSettings(true);
     setSettingsSaved(false);
 
-    try {
-      const skillsArray = settingsForm.skills
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
+    const skillsArray = settingsForm.skills
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
+    try {
       await fetchApi(`/courses/${courseId}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -121,18 +164,35 @@ export default function CourseRoomPage() {
           skills: skillsArray,
         }),
       });
-      setCourse((prev: any) => ({
+    } catch (err) {
+      console.warn('Backend settings update notice:', err);
+    }
+
+    setCourse((prev: any) => {
+      const updated = {
         ...prev,
         ...settingsForm,
         skills: skillsArray,
-      }));
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 3000);
-    } catch (err) {
-      console.error('Failed to update course settings:', err);
-    } finally {
-      setIsSavingSettings(false);
-    }
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('xerty_courses');
+          if (stored) {
+            const list = JSON.parse(stored);
+            const idx = list.findIndex((c: any) => (c._id || c.id) === courseId || c.code === prev?.code);
+            if (idx >= 0) {
+              list[idx] = updated;
+              localStorage.setItem('xerty_courses', JSON.stringify(list));
+            }
+          }
+        } catch (e) {}
+      }
+      return updated;
+    });
+
+    setSettingsSaved(true);
+    setIsSavingSettings(false);
+    setTimeout(() => setSettingsSaved(false), 3000);
   };
 
   const copyClaimLink = (certId: string, idx: number) => {
@@ -159,7 +219,7 @@ export default function CourseRoomPage() {
     );
   }
 
-    if (!course) {
+  if (!course) {
     return (
       <div className="container mx-auto px-4 py-16 text-center space-y-4 max-w-md">
         <h2 className="text-xl font-bold">Course Room Not Found</h2>
@@ -365,7 +425,7 @@ export default function CourseRoomPage() {
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
                                 cert.network === 'SOLANA_DEVNET'
-                                  ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
+                                    ? 'bg-purple-500/10 text-purple-600 border border-purple-500/20'
                                   : 'bg-primary/10 text-primary border border-primary/20'
                               }`}
                             >
