@@ -341,16 +341,19 @@ export function CourseIssuanceModal({
         }
       }
 
+      const finalTxHash = results[0]?.transactionHash || mockTxHash;
+      const finalSolSig = results[0]?.solanaSignature || mockSolanaSig;
+
       setIssuedResults(results);
       setBatchMetadata({
         network,
         distributionMode,
         total: results.length,
-        txHash: mockTxHash,
-        solanaSignature: mockSolanaSig,
+        txHash: finalTxHash,
+        solanaSignature: finalSolSig,
         explorerUrl: isSolana
-          ? `https://explorer.solana.com/tx/${mockSolanaSig}?cluster=devnet`
-          : `https://sepolia.arbiscan.io/tx/${mockTxHash}`,
+          ? `https://explorer.solana.com/tx/${finalSolSig}?cluster=devnet`
+          : `https://sepolia.arbiscan.io/tx/${finalTxHash}`,
         timestamp: issueDate.toLocaleString(),
       });
 

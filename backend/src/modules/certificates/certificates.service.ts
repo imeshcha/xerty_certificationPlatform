@@ -20,6 +20,7 @@ import {
 } from './dto/create-certificate.dto';
 import { RelayClaimDto } from './dto/relay-claim.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { SolanaService } from '../blockchain/solana.service';
 
 @Injectable()
 export class CertificatesService {
@@ -28,6 +29,7 @@ export class CertificatesService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Course.name) private courseModel: Model<CourseDocument>,
     private blockchainService: BlockchainService,
+    private solanaService: SolanaService,
   ) {}
 
   private async resolveUserObjectId(identifier: string): Promise<Types.ObjectId> {
@@ -212,6 +214,28 @@ export class CertificatesService {
   async create(dto: CreateCertificateDto): Promise<CertificateDocument> {
     const issuerObjectId = await this.resolveUserObjectId(dto.issuerId);
     const courseObjectId = await this.resolveCourseObjectId(dto.courseId);
+
+    let txHash = dto.transactionHash;
+    let solSignature = dto.solanaSignature;
+
+    if (dto.network === 'SOLANA_DEVNET') {
+      const solRes = await this.solanaService.issueCertificateOnSolana(
+        dto.certificateId,
+        dto.certificateHash,
+        dto.studentWallet || '',
+        dto.ipfsCID,
+      );
+      solSignature = solRes.signature;
+    } else {
+      const arbRes = await this.blockchainService.issueCertificateOnChain(
+        dto.certificateId,
+        dto.certificateHash,
+        dto.studentWallet || '',
+        dto.ipfsCID,
+      );
+      txHash = arbRes.txHash;
+    }
+
     const newCert = new this.certModel({
       ...dto,
       issuerId: issuerObjectId,
@@ -219,6 +243,8 @@ export class CertificatesService {
       certificateHash: dto.certificateHash.toLowerCase(),
       studentWallet: (dto.studentWallet || '').toLowerCase(),
       studentEmail: dto.studentEmail.toLowerCase(),
+      transactionHash: txHash,
+      solanaSignature: solSignature,
       issueDate: dto.issueDate || new Date(),
     });
     return newCert.save();
@@ -229,6 +255,28 @@ export class CertificatesService {
       dtoList.map(async (dto) => {
         const issuerObjectId = await this.resolveUserObjectId(dto.issuerId);
         const courseObjectId = await this.resolveCourseObjectId(dto.courseId);
+
+        let txHash = dto.transactionHash;
+        let solSignature = dto.solanaSignature;
+
+        if (dto.network === 'SOLANA_DEVNET') {
+          const solRes = await this.solanaService.issueCertificateOnSolana(
+            dto.certificateId,
+            dto.certificateHash,
+            dto.studentWallet || '',
+            dto.ipfsCID,
+          );
+          solSignature = solRes.signature;
+        } else {
+          const arbRes = await this.blockchainService.issueCertificateOnChain(
+            dto.certificateId,
+            dto.certificateHash,
+            dto.studentWallet || '',
+            dto.ipfsCID,
+          );
+          txHash = arbRes.txHash;
+        }
+
         return {
           ...dto,
           issuerId: issuerObjectId,
@@ -236,6 +284,8 @@ export class CertificatesService {
           certificateHash: dto.certificateHash.toLowerCase(),
           studentWallet: (dto.studentWallet || '').toLowerCase(),
           studentEmail: dto.studentEmail.toLowerCase(),
+          transactionHash: txHash,
+          solanaSignature: solSignature,
           issueDate: dto.issueDate || new Date(),
         };
       }),
