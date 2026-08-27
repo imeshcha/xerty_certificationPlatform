@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { AuthModal } from '../components/auth/AuthModal';
 
 export default function HomePage() {
-  const { isAuthenticated, userRole } = useAuth();
+  const { isAuthenticated, userRole, isProfileComplete } = useAuth();
   const [authModalRole, setAuthModalRole] = useState<'ISSUER' | 'STUDENT' | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -49,12 +49,26 @@ export default function HomePage() {
               >
                 Get Started / Sign Up →
               </Button>
-            ) : (
-              <Link href={userRole === 'ISSUER' ? '/issuer' : '/student'}>
+            ) : userRole === 'ISSUER' ? (
+              <Link href="/issuer">
                 <Button size="lg" className="h-11 px-8 font-semibold shadow-md">
-                  {userRole === 'ISSUER' ? 'Open Issuer Studio →' : 'Open Student Vault →'}
+                  Open Issuer Studio →
                 </Button>
               </Link>
+            ) : userRole === 'STUDENT' ? (
+              <Link href="/student">
+                <Button size="lg" className="h-11 px-8 font-semibold shadow-md">
+                  Open Student Vault →
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                size="lg"
+                className="h-11 px-8 font-semibold shadow-md"
+                onClick={() => setIsAuthModalOpen(true)}
+              >
+                Complete Account Setup →
+              </Button>
             )}
 
             <Link href="/verify">
@@ -82,10 +96,16 @@ export default function HomePage() {
               <p>• Unified batch claim links for whole cohorts</p>
             </CardContent>
             <CardFooter className="pt-4 border-t border-border/40">
-              {isAuthenticated ? (
-                <Link href={userRole === 'ISSUER' ? '/issuer' : '/student'} className="w-full">
-                  <Button className="w-full font-semibold" variant={userRole === 'ISSUER' ? 'default' : 'outline'}>
-                    {userRole === 'ISSUER' ? 'Launch Issuer Studio' : 'Enter as Issuer'}
+              {isAuthenticated && userRole === 'ISSUER' ? (
+                <Link href="/issuer" className="w-full">
+                  <Button className="w-full font-semibold" variant="default">
+                    Launch Issuer Studio
+                  </Button>
+                </Link>
+              ) : isAuthenticated && userRole === 'STUDENT' ? (
+                <Link href="/student" className="w-full">
+                  <Button className="w-full font-semibold" variant="outline">
+                    Student Account Active
                   </Button>
                 </Link>
               ) : (
@@ -114,10 +134,16 @@ export default function HomePage() {
               <p>• Soulbound credentials stored in permanent personal vault</p>
             </CardContent>
             <CardFooter className="pt-4 border-t border-border/40">
-              {isAuthenticated ? (
+              {isAuthenticated && userRole === 'STUDENT' ? (
                 <Link href="/student" className="w-full">
                   <Button className="w-full font-semibold" variant="outline">
                     Open Student Vault
+                  </Button>
+                </Link>
+              ) : isAuthenticated && userRole === 'ISSUER' ? (
+                <Link href="/issuer" className="w-full">
+                  <Button className="w-full font-semibold" variant="outline">
+                    Issuer Account Active
                   </Button>
                 </Link>
               ) : (

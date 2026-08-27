@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,10 +9,17 @@ import { AuthModal } from '../auth/AuthModal';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { isAuthenticated, userRole } = useAuth();
+  const { isAuthenticated, userRole, isProfileComplete } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const isLandingPage = pathname === '/';
+
+  // Automatically open AuthModal if user logged in with Privy but hasn't completed their Account Info Form
+  useEffect(() => {
+    if (isAuthenticated && !isProfileComplete && !userRole) {
+      setIsAuthModalOpen(true);
+    }
+  }, [isAuthenticated, isProfileComplete, userRole]);
 
   return (
     <>
@@ -74,7 +81,7 @@ export function Navbar() {
               Verify Certificate
             </Link>
 
-            {/* If NOT logged in: Show Login / Sign Up Button that opens AuthModal */}
+            {/* If NOT logged in: Show Login / Sign Up Button */}
             {!isAuthenticated ? (
               <Button
                 onClick={() => setIsAuthModalOpen(true)}
@@ -86,13 +93,34 @@ export function Navbar() {
             ) : (
               /* If Logged In: Show Single Dashboard Button + Role Badge + Profile Link */
               <div className="flex items-center space-x-2.5">
-                {/* On Landing Page: Only show their specific role dashboard button */}
+                {/* On Landing Page: Only show specific role button */}
                 {isLandingPage && (
-                  <Link href={userRole === 'ISSUER' ? '/issuer' : '/student'}>
-                    <Button size="sm" variant="outline" className="text-xs h-8 font-semibold">
-                      {userRole === 'ISSUER' ? 'Issuer Studio →' : 'Student Vault →'}
-                    </Button>
-                  </Link>
+                  <>
+                    {userRole === 'ISSUER' && (
+                      <Link href="/issuer">
+                        <Button size="sm" variant="outline" className="text-xs h-8 font-semibold">
+                          Issuer Studio →
+                        </Button>
+                      </Link>
+                    )}
+                    {userRole === 'STUDENT' && (
+                      <Link href="/student">
+                        <Button size="sm" variant="outline" className="text-xs h-8 font-semibold">
+                          Student Vault →
+                        </Button>
+                      </Link>
+                    )}
+                    {!userRole && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="text-xs h-8 font-semibold"
+                        onClick={() => setIsAuthModalOpen(true)}
+                      >
+                        Complete Account Setup →
+                      </Button>
+                    )}
+                  </>
                 )}
 
                 {/* Role Badge */}

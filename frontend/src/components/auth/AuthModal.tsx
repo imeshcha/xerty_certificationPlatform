@@ -9,8 +9,6 @@ import {
   Building2,
   GraduationCap,
   ArrowRight,
-  ArrowLeft,
-  Check,
   Sparkles,
   Lock,
   X,
@@ -19,6 +17,7 @@ import {
   User as UserIcon,
   Wallet,
   CheckCircle2,
+  Check,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -34,9 +33,21 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
   const authenticated = privy?.authenticated ?? false;
   const user = privy?.user ?? null;
 
-  const [selectedRole, setSelectedRole] = useState<'ISSUER' | 'STUDENT' | null>(defaultRole);
+  const [selectedRole, setSelectedRole] = useState<'ISSUER' | 'STUDENT' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Read role from prop or localStorage
+  useEffect(() => {
+    if (defaultRole) {
+      setSelectedRole(defaultRole);
+    } else if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('xerty_selected_role') as 'ISSUER' | 'STUDENT' | null;
+      if (stored) {
+        setSelectedRole(stored);
+      }
+    }
+  }, [defaultRole, isOpen]);
 
   // Issuer Form Data
   const [issuerForm, setIssuerForm] = useState({
@@ -76,6 +87,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('xerty_selected_role', role);
+      localStorage.setItem('xerty_user_role', role);
     }
 
     // If not yet authenticated, launch Privy login immediately
@@ -139,7 +151,8 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       }
 
       onClose();
-      router.push('/issuer');
+      // Hard navigation to ensure all layout guards re-evaluate role
+      window.location.href = '/issuer';
     } catch (err: any) {
       console.error('Failed to complete issuer registration:', err);
       if (typeof window !== 'undefined') {
@@ -147,7 +160,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         localStorage.setItem('xerty_onboarding_completed', 'true');
       }
       onClose();
-      router.push('/issuer');
+      window.location.href = '/issuer';
     } finally {
       setIsSubmitting(false);
     }
@@ -187,7 +200,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       }
 
       onClose();
-      router.push('/student');
+      window.location.href = '/student';
     } catch (err: any) {
       console.error('Failed to complete student registration:', err);
       if (typeof window !== 'undefined') {
@@ -195,16 +208,12 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         localStorage.setItem('xerty_onboarding_completed', 'true');
       }
       onClose();
-      router.push('/student');
+      window.location.href = '/student';
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Check which step to render:
-  // Step A: Not selected a role yet -> Role Cards
-  // Step B: Role selected but not logged in -> Prompt to connect
-  // Step C: Role selected AND logged in -> Fill Information Form
   const showRoleSelection = !selectedRole;
   const showLoginPrompt = selectedRole && !authenticated;
   const showInfoForm = selectedRole && authenticated;
@@ -395,7 +404,10 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedRole(null)}
+                onClick={() => {
+                  setSelectedRole(null);
+                  if (typeof window !== 'undefined') localStorage.removeItem('xerty_selected_role');
+                }}
                 className="text-xs text-muted-foreground"
               >
                 ← Change Selected Role
