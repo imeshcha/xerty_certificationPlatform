@@ -23,6 +23,7 @@ import {
 interface StudentCertificate {
   _id?: string;
   certificateId: string;
+  network?: string;
   courseTitle?: string;
   courseCode?: string;
   issuerName?: string;
@@ -30,6 +31,7 @@ interface StudentCertificate {
   grade?: string;
   score?: number;
   transactionHash?: string;
+  solanaSignature?: string;
   ipfsCID?: string;
   status: string;
 }
@@ -197,7 +199,7 @@ export default function StudentDashboardPage() {
                 <div className="h-48 rounded-t-xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border-b border-amber-500/30 p-5 flex flex-col justify-between relative">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-mono text-[10px] text-amber-300/80 uppercase font-semibold">
-                      Soulbound Token (ERC-5192)
+                      {cert.network === 'SOLANA_DEVNET' ? 'Solana Devnet (SVM)' : 'Soulbound Token (ERC-5192)'}
                     </span>
                     <span className="flex items-center gap-1 text-green-400 font-medium text-[11px]">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -234,7 +236,18 @@ export default function StudentDashboardPage() {
                           Verify
                         </Button>
                       </Link>
-                      {cert.transactionHash && (
+                      {cert.network === 'SOLANA_DEVNET' || cert.solanaSignature ? (
+                        <a
+                          href={`https://explorer.solana.com/tx/${cert.solanaSignature}?cluster=devnet`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="ghost" size="sm" className="h-8 text-xs text-purple-600">
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                            Solana Explorer
+                          </Button>
+                        </a>
+                      ) : cert.transactionHash ? (
                         <a
                           href={`https://sepolia.arbiscan.io/tx/${cert.transactionHash}`}
                           target="_blank"
@@ -245,7 +258,7 @@ export default function StudentDashboardPage() {
                             Arbiscan
                           </Button>
                         </a>
-                      )}
+                      ) : null}
                     </div>
 
                     <a
