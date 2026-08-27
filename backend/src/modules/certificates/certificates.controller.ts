@@ -118,4 +118,13 @@ export class CertificatesController {
   ) {
     return this.certificatesService.topUpGasTank(issuerId, body.amount || 25);
   }
+
+  @Get('vault/:issuerAddress')
+  @ApiOperation({ summary: 'Get on-chain smart contract gas vault balance' })
+  @ApiResponse({ status: 200, description: 'On-chain gas vault details retrieved' })
+  async getOnChainGasVault(
+    @Param('issuerAddress') issuerAddress: string,
+  ) {
+    return this.certificatesService.getOnChainVault(issuerAddress);
+  }
 }

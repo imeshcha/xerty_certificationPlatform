@@ -19,6 +19,7 @@ import {
   RevokeCertificateDto,
 } from './dto/create-certificate.dto';
 import { RelayClaimDto } from './dto/relay-claim.dto';
+import { BlockchainService } from '../blockchain/blockchain.service';
 
 @Injectable()
 export class CertificatesService {
@@ -26,6 +27,7 @@ export class CertificatesService {
     @InjectModel(Certificate.name) private certModel: Model<CertificateDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Course.name) private courseModel: Model<CourseDocument>,
+    private blockchainService: BlockchainService,
   ) {}
 
   private async resolveUserObjectId(identifier: string): Promise<Types.ObjectId> {
@@ -373,5 +375,9 @@ export class CertificatesService {
       throw new NotFoundException('Certificate record not found');
     }
     return updated;
+  }
+
+  async getOnChainVault(issuerAddress: string) {
+    return this.blockchainService.getOnChainGasVault(issuerAddress);
   }
 }

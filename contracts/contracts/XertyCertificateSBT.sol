@@ -42,6 +42,12 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
     // CertHash (bytes32) => TokenId
     mapping(bytes32 => uint256) private _hashToToken;
 
+    // --- ISSUER ON-CHAIN GAS VAULT ---
+    // Issuer Address => Deposited Gas Balance (in wei)
+    mapping(address => uint256) public issuerGasVault;
+    // CourseId => Deposited Gas Balance (in wei)
+    mapping(string => uint256) public courseGasVault;
+
     event CertificateIssued(
         uint256 indexed tokenId,
         string indexed certificateId,
@@ -55,6 +61,17 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
         uint256 indexed tokenId,
         string indexed certificateId,
         string reason
+    );
+
+    event GasDeposited(
+        address indexed issuer,
+        string indexed courseId,
+        uint256 amount
+    );
+
+    event GasWithdrawn(
+        address indexed issuer,
+        uint256 amount
     );
 
     constructor(
@@ -203,6 +220,42 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
             revert("XertySBT: Soulbound tokens cannot be transferred");
         }
         return super._update(to, tokenId, auth);
+    }
+
+    // --- ISSUER GAS VAULT METHODS ---
+
+    /**
+     * @dev Allows an Issuer to deposit ETH into their on-chain gas escrow
+     * to sponsor student claim minting costs for a specific course or globally.
+     */
+    function depositGas(string calldata courseId) external payable {
+        require(msg.value > 0, "Must deposit non-zero ETH");
+        issuerGasVault[msg.sender] += msg.value;
+        if (bytes(courseId).length > 0) {
+            courseGasVault[courseId] += msg.value;
+        }
+        emit GasDeposited(msg.sender, courseId, msg.value);
+    }
+
+    /**
+     * @dev Allows an Issuer to withdraw unspent gas funds from their vault back to their wallet.
+     */
+    function withdrawGas(uint256 amount) external {
+        require(issuerGasVault[msg.sender] >= amount, "Insufficient vault balance");
+        issuerGasVault[msg.sender] -= amount;
+        
+        (bool sent, ) = payable(msg.sender).call{value: amount}("");
+        require(sent, "Failed to refund ETH");
+
+        emit GasWithdrawn(msg.sender, amount);
+    }
+
+    function getIssuerGasBalance(address issuer) external view returns (uint256) {
+        return issuerGasVault[issuer];
+    }
+
+    function getCourseGasBalance(string calldata courseId) external view returns (uint256) {
+        return courseGasVault[courseId];
     }
 
     function supportsInterface(bytes4 interfaceId)
