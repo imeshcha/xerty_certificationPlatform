@@ -31,6 +31,7 @@ export function CourseIssuanceModal({
 }: CourseIssuanceModalProps) {
   const [network, setNetwork] = useState<'ARBITRUM_SEPOLIA' | 'SOLANA_DEVNET'>('ARBITRUM_SEPOLIA');
   const [distributionMode, setDistributionMode] = useState<'CLAIM_LINK' | 'DIRECT_WALLET'>('CLAIM_LINK');
+  const [mintingEngine, setMintingEngine] = useState<'RELAYER' | 'DIRECT_WALLET'>('RELAYER');
   const [inputMode, setInputMode] = useState<'MANUAL' | 'CSV'>('MANUAL');
   const [isProcessing, setIsProcessing] = useState(false);
   const [issuedResults, setIssuedResults] = useState<any[] | null>(null);
@@ -524,18 +525,73 @@ export function CourseIssuanceModal({
                         Crypto Native
                       </span>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Blockchain Minting Engine & Authority */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold uppercase text-muted-foreground font-mono block">
+                    3. On-Chain Minting Engine & Authority
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">
+                    Arbitrum Sepolia ERC-5192 Anchor
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setMintingEngine('RELAYER')}
+                    className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer ${
+                      mintingEngine === 'RELAYER'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border bg-background hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 font-bold text-foreground">
+                        <span>⚡ Platform Relayer Engine</span>
+                      </div>
+                      <span className="rounded bg-primary/10 text-primary text-[10px] font-semibold px-2 py-0.5 border border-primary/20">
+                        Default
+                      </span>
+                    </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      <strong>Direct on-chain mint to wallet.</strong> Requires providing student crypto addresses ({network === 'SOLANA_DEVNET' ? 'Solana' : 'EVM 0x...'}). Tokens appear directly in their wallet.
+                      <strong>Zero gas needed from issuer.</strong> Xerty backend relayer wallet broadcasts the batch and sponsors all on-chain gas costs.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setMintingEngine('DIRECT_WALLET')}
+                    className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer ${
+                      mintingEngine === 'DIRECT_WALLET'
+                        ? 'border-purple-500 bg-purple-500/5 ring-1 ring-purple-500'
+                        : 'border-border bg-background hover:border-purple-400/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 font-bold text-foreground">
+                        <span>🦊 Direct Issuer Wallet (Self-Signed)</span>
+                      </div>
+                      <span className="rounded bg-muted text-muted-foreground text-[10px] font-semibold px-2 py-0.5">
+                        Web3 Native
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      <strong>Full cryptographic self-sovereignty.</strong> Sign directly from your connected MetaMask/Phantom wallet to stamp your address as official issuer.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Step 3: Input Method Selector & Student Data */}
+              {/* Step 4: Input Method Selector & Student Data */}
+
+              {/* Step 4: Input Method Selector & Student Data */}
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="text-[11px] font-semibold uppercase text-muted-foreground font-mono block">
-                    3. Add Student Details ({rows.length} Recipients)
+                    4. Add Student Details ({rows.length} Recipients)
                   </label>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button
