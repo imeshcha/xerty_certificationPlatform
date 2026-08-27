@@ -4,12 +4,13 @@ import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { fetchApi } from '../../lib/api';
+import { Link2, Send, CheckCircle2, Sparkles, HelpCircle, ShieldCheck } from 'lucide-react';
 
 export interface RecipientRow {
   id: string;
   studentName: string;
   studentEmail: string;
-  studentWallet: string;
+  studentWallet?: string;
   grade: string;
   score: string;
   customVariables?: Record<string, string>;
@@ -29,6 +30,7 @@ export function CourseIssuanceModal({
   onSuccess,
 }: CourseIssuanceModalProps) {
   const [network, setNetwork] = useState<'ARBITRUM_SEPOLIA' | 'SOLANA_DEVNET'>('ARBITRUM_SEPOLIA');
+  const [distributionMode, setDistributionMode] = useState<'CLAIM_LINK' | 'DIRECT_WALLET'>('CLAIM_LINK');
   const [inputMode, setInputMode] = useState<'MANUAL' | 'CSV'>('MANUAL');
   const [isProcessing, setIsProcessing] = useState(false);
   const [issuedResults, setIssuedResults] = useState<any[] | null>(null);
@@ -79,7 +81,9 @@ export function CourseIssuanceModal({
         id: `${Date.now()}-${prev.length + 1}`,
         studentName: '',
         studentEmail: '',
-        studentWallet: network === 'SOLANA_DEVNET' ? '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU' : '0x1234567890abcdef1234567890abcdef12345678',
+        studentWallet: distributionMode === 'DIRECT_WALLET'
+          ? (network === 'SOLANA_DEVNET' ? '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU' : '0x1234567890abcdef1234567890abcdef12345678')
+          : '',
         grade: 'Pass',
         score: '85',
       },
@@ -98,40 +102,73 @@ export function CourseIssuanceModal({
   };
 
   const fillDemoSample = () => {
-    setRows([
-      {
-        id: '1',
-        studentName: 'Alice Johnson',
-        studentEmail: 'alice@university.edu',
-        studentWallet: network === 'SOLANA_DEVNET' ? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' : '0x71C...39B',
-        grade: 'High Distinction',
-        score: '98.5',
-      },
-      {
-        id: '2',
-        studentName: 'David Chen',
-        studentEmail: 'david.chen@crypto.org',
-        studentWallet: network === 'SOLANA_DEVNET' ? '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU' : '0x82A...54C',
-        grade: 'Distinction',
-        score: '94.0',
-      },
-      {
-        id: '3',
-        studentName: 'Elena Rostova',
-        studentEmail: 'elena@web3devs.io',
-        studentWallet: network === 'SOLANA_DEVNET' ? '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM' : '0x99B...12F',
-        grade: 'Merit',
-        score: '89.2',
-      },
-      {
-        id: '4',
-        studentName: 'Marcus Vance',
-        studentEmail: 'marcus@academy.net',
-        studentWallet: network === 'SOLANA_DEVNET' ? '3FZbT4kLsV3Q7tP1wM2xN8rT6yU4iO9pA3sD5fG7hJ1k' : '0x44D...88A',
-        grade: 'Pass',
-        score: '78.5',
-      },
-    ]);
+    if (distributionMode === 'CLAIM_LINK') {
+      setRows([
+        {
+          id: '1',
+          studentName: 'Alice Johnson',
+          studentEmail: 'alice@university.edu',
+          grade: 'High Distinction',
+          score: '98.5',
+        },
+        {
+          id: '2',
+          studentName: 'David Chen',
+          studentEmail: 'david.chen@crypto.org',
+          grade: 'Distinction',
+          score: '94.0',
+        },
+        {
+          id: '3',
+          studentName: 'Elena Rostova',
+          studentEmail: 'elena@web3devs.io',
+          grade: 'Merit',
+          score: '89.2',
+        },
+        {
+          id: '4',
+          studentName: 'Marcus Vance',
+          studentEmail: 'marcus@academy.net',
+          grade: 'Pass',
+          score: '78.5',
+        },
+      ]);
+    } else {
+      setRows([
+        {
+          id: '1',
+          studentName: 'Alice Johnson',
+          studentEmail: 'alice@university.edu',
+          studentWallet: network === 'SOLANA_DEVNET' ? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' : '0x71C...39B',
+          grade: 'High Distinction',
+          score: '98.5',
+        },
+        {
+          id: '2',
+          studentName: 'David Chen',
+          studentEmail: 'david.chen@crypto.org',
+          studentWallet: network === 'SOLANA_DEVNET' ? '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU' : '0x82A...54C',
+          grade: 'Distinction',
+          score: '94.0',
+        },
+        {
+          id: '3',
+          studentName: 'Elena Rostova',
+          studentEmail: 'elena@web3devs.io',
+          studentWallet: network === 'SOLANA_DEVNET' ? '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM' : '0x99B...12F',
+          grade: 'Merit',
+          score: '89.2',
+        },
+        {
+          id: '4',
+          studentName: 'Marcus Vance',
+          studentEmail: 'marcus@academy.net',
+          studentWallet: network === 'SOLANA_DEVNET' ? '3FZbT4kLsV3Q7tP1wM2xN8rT6yU4iO9pA3sD5fG7hJ1k' : '0x44D...88A',
+          grade: 'Pass',
+          score: '78.5',
+        },
+      ]);
+    }
   };
 
   // CSV File Upload Parser
@@ -162,7 +199,7 @@ export function CourseIssuanceModal({
             id: `csv-${i}`,
             studentName: nameIdx !== -1 ? parts[nameIdx] || `Student ${i}` : parts[0] || `Student ${i}`,
             studentEmail: emailIdx !== -1 ? parts[emailIdx] || `student${i}@example.com` : parts[1] || `student${i}@example.com`,
-            studentWallet: walletIdx !== -1 && parts[walletIdx] ? parts[walletIdx] : (network === 'SOLANA_DEVNET' ? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' : '0x1234567890abcdef1234567890abcdef12345678'),
+            studentWallet: walletIdx !== -1 && parts[walletIdx] ? parts[walletIdx] : (distributionMode === 'DIRECT_WALLET' ? (network === 'SOLANA_DEVNET' ? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' : '0x1234567890abcdef1234567890abcdef12345678') : ''),
             grade: gradeIdx !== -1 ? parts[gradeIdx] || 'Pass' : 'Pass',
             score: scoreIdx !== -1 ? parts[scoreIdx] || '85' : '85',
           });
@@ -171,7 +208,7 @@ export function CourseIssuanceModal({
 
       if (parsed.length > 0) {
         setRows(parsed);
-        setInputMode('MANUAL'); // Switch to manual to view and edit parsed records
+        setInputMode('MANUAL');
       }
     };
 
@@ -185,6 +222,14 @@ export function CourseIssuanceModal({
     if (validRows.length === 0) {
       alert('Please provide at least one student with a valid Name and Email.');
       return;
+    }
+
+    if (distributionMode === 'DIRECT_WALLET') {
+      const missingWallets = validRows.filter((r) => !r.studentWallet || r.studentWallet.trim().length === 0);
+      if (missingWallets.length > 0) {
+        alert('In Direct Wallet Airdrop mode, all student rows must have a valid on-chain wallet address.');
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -206,6 +251,10 @@ export function CourseIssuanceModal({
         const ipfsCid = `Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
         const certHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
 
+        const studentWalletValue = distributionMode === 'DIRECT_WALLET' && r.studentWallet
+          ? r.studentWallet
+          : '';
+
         // Complete metadata payload stored on IPFS & Blockchain
         const metadataJson = {
           name: `Certificate of Completion - ${course.title}`,
@@ -221,7 +270,7 @@ export function CourseIssuanceModal({
           recipient: {
             name: r.studentName,
             email: r.studentEmail,
-            wallet: r.studentWallet,
+            wallet: studentWalletValue || 'CLAIM_LINK_PENDING',
           },
           academic: {
             grade: r.grade || 'Pass',
@@ -230,6 +279,7 @@ export function CourseIssuanceModal({
           },
           protocol: {
             network,
+            distributionMode,
             standard: isSolana ? 'SOLANA_SOULBOUND_METAPLEX' : 'ERC5192_SOULBOUND',
             certificateId: certId,
             ipfsCid,
@@ -248,7 +298,7 @@ export function CourseIssuanceModal({
           solanaSignature: mockSolanaSig,
           studentName: r.studentName,
           studentEmail: r.studentEmail,
-          studentWallet: r.studentWallet,
+          studentWallet: studentWalletValue,
           grade: r.grade || 'Pass',
           score: parseFloat(r.score) || 85,
           issueDate,
@@ -276,6 +326,7 @@ export function CourseIssuanceModal({
       setIssuedResults(results);
       setBatchMetadata({
         network,
+        distributionMode,
         total: results.length,
         txHash: mockTxHash,
         solanaSignature: mockSolanaSig,
@@ -404,13 +455,73 @@ export function CourseIssuanceModal({
                 </div>
               </div>
 
-              {/* Step 2: Input Method Selector */}
-              <div className="space-y-3">
+              {/* Step 2: Distribution Mode Selector (Claim Link vs Direct Wallet Airdrop) */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold uppercase text-muted-foreground font-mono block">
-                    2. Add Student Details & Variable Values ({rows.length} Recipients)
+                    2. Distribution & Claiming Method
                   </label>
-                  <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">
+                    Zero gas fees for students in both modes
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Mode 1: Claim Link Mode (Recommended) */}
+                  <div
+                    onClick={() => setDistributionMode('CLAIM_LINK')}
+                    className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      distributionMode === 'CLAIM_LINK'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border bg-background hover:border-primary/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 font-bold text-foreground">
+                        <Link2 className="h-4 w-4 text-primary" />
+                        <span>Student Claim Link Mode</span>
+                      </div>
+                      <span className="rounded bg-primary/10 text-primary text-[10px] font-semibold px-2 py-0.5 border border-primary/20">
+                        Recommended
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      <strong>No crypto wallet needed from students.</strong> You only provide Student Name & Email. Students claim for free via Email or Web3 wallet using a single master claim link.
+                    </p>
+                  </div>
+
+                  {/* Mode 2: Direct Wallet Airdrop Mode */}
+                  <div
+                    onClick={() => setDistributionMode('DIRECT_WALLET')}
+                    className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      distributionMode === 'DIRECT_WALLET'
+                        ? 'border-purple-500 bg-purple-500/5 ring-1 ring-purple-500'
+                        : 'border-border bg-background hover:border-purple-400/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5 font-bold text-foreground">
+                        <Send className="h-4 w-4 text-purple-600" />
+                        <span>Direct Wallet Airdrop Mode</span>
+                      </div>
+                      <span className="rounded bg-muted text-muted-foreground text-[10px] font-semibold px-2 py-0.5">
+                        Crypto Native
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      <strong>Direct on-chain mint to wallet.</strong> Requires providing student crypto addresses ({network === 'SOLANA_DEVNET' ? 'Solana' : 'EVM 0x...'}). Tokens appear directly in their wallet.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Input Method Selector & Student Data */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-[11px] font-semibold uppercase text-muted-foreground font-mono block">
+                    3. Add Student Details ({rows.length} Recipients)
+                  </label>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       size="sm"
                       variant={inputMode === 'MANUAL' ? 'secondary' : 'ghost'}
@@ -443,7 +554,11 @@ export function CourseIssuanceModal({
                   <div className="p-6 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center text-center space-y-2 bg-muted/20">
                     <p className="font-semibold text-foreground">Upload CSV File</p>
                     <p className="text-muted-foreground text-[11px] max-w-sm">
-                      CSV columns can include: <code>student_name</code>, <code>student_email</code>, <code>wallet_address</code>, <code>grade</code>, <code>score</code>.
+                      {distributionMode === 'CLAIM_LINK' ? (
+                        <>CSV columns: <code>student_name</code>, <code>student_email</code>, <code>grade</code>, <code>score</code> (no wallet needed).</>
+                      ) : (
+                        <>CSV columns: <code>student_name</code>, <code>student_email</code>, <code>wallet_address</code>, <code>grade</code>, <code>score</code>.</>
+                      )}
                     </p>
                     <input
                       type="file"
@@ -466,9 +581,13 @@ export function CourseIssuanceModal({
                     <thead className="bg-muted/60 text-muted-foreground border-b uppercase font-mono text-[10px]">
                       <tr>
                         <th className="p-2.5 w-8">#</th>
-                        <th className="p-2.5 min-w-[150px]">Student Name *</th>
-                        <th className="p-2.5 min-w-[180px]">Student Email *</th>
-                        <th className="p-2.5 min-w-[200px]">Wallet Address</th>
+                        <th className="p-2.5 min-w-[160px]">Student Name *</th>
+                        <th className="p-2.5 min-w-[190px]">Student Email *</th>
+                        {distributionMode === 'DIRECT_WALLET' && (
+                          <th className="p-2.5 min-w-[220px]">
+                            {network === 'SOLANA_DEVNET' ? 'Solana Wallet Address *' : 'EVM Wallet Address (0x...) *'}
+                          </th>
+                        )}
                         <th className="p-2.5 min-w-[100px]">Grade / Honor</th>
                         <th className="p-2.5 min-w-[80px]">Score %</th>
                         <th className="p-2.5 w-12 text-center">Action</th>
@@ -496,15 +615,17 @@ export function CourseIssuanceModal({
                               onChange={(e) => updateRow(row.id, 'studentEmail', e.target.value)}
                             />
                           </td>
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              placeholder={network === 'SOLANA_DEVNET' ? 'Solana address...' : '0x...'}
-                              className="w-full rounded border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-                              value={row.studentWallet}
-                              onChange={(e) => updateRow(row.id, 'studentWallet', e.target.value)}
-                            />
-                          </td>
+                          {distributionMode === 'DIRECT_WALLET' && (
+                            <td className="p-2">
+                              <input
+                                type="text"
+                                placeholder={network === 'SOLANA_DEVNET' ? 'Solana address...' : '0x...'}
+                                className="w-full rounded border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                                value={row.studentWallet || ''}
+                                onChange={(e) => updateRow(row.id, 'studentWallet', e.target.value)}
+                              />
+                            </td>
+                          )}
                           <td className="p-2">
                             <input
                               type="text"
@@ -556,12 +677,12 @@ export function CourseIssuanceModal({
               <div className="p-4 rounded-xl border border-green-500/40 bg-green-500/10 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-green-600">
-                    ✓ {batchMetadata.total} Certificates Successfully Minted & Anchored!
+                    ✓ {batchMetadata.total} Certificates Successfully Initialized & Anchored!
                   </p>
                   <span className="font-mono text-[10px] text-muted-foreground">{batchMetadata.timestamp}</span>
                 </div>
                 <div className="font-mono text-muted-foreground space-y-1">
-                  <p>Network: <span className="text-foreground font-semibold">{batchMetadata.network}</span></p>
+                  <p>Network: <span className="text-foreground font-semibold">{batchMetadata.network}</span> • Mode: <span className="text-primary font-semibold">{batchMetadata.distributionMode === 'CLAIM_LINK' ? 'Gasless Claim Link' : 'Direct Wallet Airdrop'}</span></p>
                   {batchMetadata.txHash && (
                     <p className="truncate">
                       Transaction Hash:{' '}
@@ -599,7 +720,7 @@ export function CourseIssuanceModal({
                       Master Batch Student Claim Hub
                     </span>
                     <h4 className="text-sm font-bold text-foreground">
-                      One Master Link for All {batchMetadata.total} Students
+                      One Master Claim Link for All {batchMetadata.total} Students
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
@@ -627,7 +748,7 @@ export function CourseIssuanceModal({
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Share this single link with your cohort or LMS. Students can search their name or email to view and claim their certificate directly into their vault!
+                  Share this single link with your class Discord, Slack, or LMS. Students simply enter their email or connect any wallet to claim their certificate with zero gas fees!
                 </p>
                 <div className="p-2 rounded bg-background border font-mono text-xs text-primary truncate">
                   {`${origin}/claim/${course._id || course.id}`}
@@ -731,8 +852,10 @@ export function CourseIssuanceModal({
                 className="font-semibold px-6"
               >
                 {isProcessing
-                  ? 'Pinning IPFS & Minting On-Chain...'
-                  : `Issue & Mint ${rows.length} Certificates on ${network === 'SOLANA_DEVNET' ? 'Solana' : 'Arbitrum'}`}
+                  ? 'Pinning IPFS & Initializing On-Chain...'
+                  : distributionMode === 'CLAIM_LINK'
+                    ? `Issue ${rows.length} Claimable Certificates (${network === 'SOLANA_DEVNET' ? 'Solana' : 'Arbitrum'})`
+                    : `Issue & Mint ${rows.length} Certificates Directly to Wallets`}
               </Button>
             </>
           ) : (

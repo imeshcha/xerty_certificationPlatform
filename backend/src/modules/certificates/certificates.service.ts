@@ -129,7 +129,7 @@ export class CertificatesService {
       ...dto,
       issuerId: issuerObjectId,
       certificateHash: dto.certificateHash.toLowerCase(),
-      studentWallet: dto.studentWallet.toLowerCase(),
+      studentWallet: (dto.studentWallet || '').toLowerCase(),
       studentEmail: dto.studentEmail.toLowerCase(),
       issueDate: dto.issueDate || new Date(),
     });
@@ -144,7 +144,7 @@ export class CertificatesService {
           ...dto,
           issuerId: issuerObjectId,
           certificateHash: dto.certificateHash.toLowerCase(),
-          studentWallet: dto.studentWallet.toLowerCase(),
+          studentWallet: (dto.studentWallet || '').toLowerCase(),
           studentEmail: dto.studentEmail.toLowerCase(),
           issueDate: dto.issueDate || new Date(),
         };

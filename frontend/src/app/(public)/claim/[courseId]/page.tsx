@@ -169,19 +169,19 @@ export default function CourseBatchClaimPage() {
             <div className="p-3 rounded-lg bg-muted/30 border space-y-1">
               <p className="font-bold text-foreground">1. Find Your Certificate</p>
               <p className="text-muted-foreground text-[11px]">
-                Type your student name, email, or wallet in the search bar below.
+                Type your student name or email in the search bar below.
               </p>
             </div>
             <div className="p-3 rounded-lg bg-muted/30 border space-y-1">
-              <p className="font-bold text-foreground">2. Select & Preview</p>
+              <p className="font-bold text-foreground">2. 100% Free & Gasless</p>
               <p className="text-muted-foreground text-[11px]">
-                Click on your credential to inspect grades, IPFS metadata, and proof.
+                All blockchain fees are sponsored by your institution. No gas cost for you.
               </p>
             </div>
             <div className="p-3 rounded-lg bg-muted/30 border space-y-1">
-              <p className="font-bold text-foreground">3. Claim to Vault</p>
+              <p className="font-bold text-foreground">3. No Crypto Wallet Needed</p>
               <p className="text-muted-foreground text-[11px]">
-                Log in with your email or connect wallet to save directly to your vault.
+                Log in with your email or connect a wallet to save to your Student Vault.
               </p>
             </div>
           </div>

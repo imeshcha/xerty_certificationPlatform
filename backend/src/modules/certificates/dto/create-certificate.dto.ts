@@ -85,10 +85,10 @@ export class CreateCertificateDto {
   @IsDateString()
   issueDate?: Date;
 
-  @ApiProperty({ example: '0xabcdef1234567890abcdef1234567890abcdef12' })
-  @IsNotEmpty()
+  @ApiProperty({ required: false, example: '0xabcdef1234567890abcdef1234567890abcdef12' })
+  @IsOptional()
   @IsString()
-  studentWallet: string;
+  studentWallet?: string;
 
   @ApiProperty({ example: 'alice@example.com' })
   @IsNotEmpty()
