@@ -13,6 +13,7 @@ export function useAuth() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [userRole, setUserRole] = useState<'ISSUER' | 'STUDENT' | null>(null);
   const [solanaAddress, setSolanaAddress] = useState<string | null>(null);
+  const hasAutoRedirected = useRef(false);
 
   const ready = privy?.ready ?? false;
   const authenticated = privy?.authenticated ?? false;
@@ -34,10 +35,13 @@ export function useAuth() {
         localStorage.removeItem('xerty_user_role');
         localStorage.removeItem('xerty_onboarding_completed');
         localStorage.removeItem('xerty_solana_address');
-        localStorage.removeItem('xerty_selected_role');
+        localStorage.removeItem('xerty_pending_role');
+        localStorage.removeItem('xerty_pending_issuer_data');
+        localStorage.removeItem('xerty_pending_student_data');
       }
       setUserRole(null);
       setSolanaAddress(null);
+      hasAutoRedirected.current = false;
       if (privy?.logout) {
         await privy.logout();
       }
@@ -61,25 +65,84 @@ export function useAuth() {
     }
   }, []);
 
-  // 2. Synchronize user with MongoDB Atlas on login (for existing users)
+  // 2. Synchronize user with MongoDB Atlas on login & process pending registrations
   useEffect(() => {
     async function syncUserWithBackend() {
-      if (ready && authenticated && (user?.wallet?.address || user?.id)) {
+      if (ready && authenticated && user?.wallet?.address) {
         try {
           setIsSyncing(true);
+
+          const pendingRole = typeof window !== 'undefined' ? localStorage.getItem('xerty_pending_role') : null;
+          const pendingIssuerRaw = typeof window !== 'undefined' ? localStorage.getItem('xerty_pending_issuer_data') : null;
+          const pendingStudentRaw = typeof window !== 'undefined' ? localStorage.getItem('xerty_pending_student_data') : null;
+
+          const requestedRole = pendingRole || (userRole || 'STUDENT');
 
           const response: any = await fetchApi('/auth/sync', {
             method: 'POST',
             body: JSON.stringify({
               privyUserId: user.id,
-              walletAddress: user?.wallet?.address || '0x0000000000000000000000000000000000000000',
+              walletAddress: user.wallet.address,
               authProvider: user.linkedAccounts?.[0]?.type?.toUpperCase() || 'GOOGLE',
               email: user.email?.address,
               fullName: user.google?.name || user.apple?.email || undefined,
+              role: requestedRole,
             }),
           });
 
           const dbUser = response?.user;
+
+          // If there is pending issuer profile data to save
+          if (pendingRole === 'ISSUER' && pendingIssuerRaw) {
+            try {
+              const issuerData = JSON.parse(pendingIssuerRaw);
+              await fetchApi('/issuers/profile', {
+                method: 'POST',
+                body: JSON.stringify({
+                  userId: user.id,
+                  academyName: issuerData.academyName,
+                  slug: issuerData.slug,
+                  onchainIssuerAddress: user.wallet.address,
+                  organizationInfo: {
+                    description: issuerData.description,
+                    website: issuerData.website,
+                    contactEmail: issuerData.contactEmail || user.email?.address,
+                  },
+                }),
+              });
+            } catch (err) {
+              console.warn('Could not save pending issuer data:', err);
+            }
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('xerty_pending_role');
+              localStorage.removeItem('xerty_pending_issuer_data');
+            }
+          }
+
+          // If there is pending student profile data to save
+          if (pendingRole === 'STUDENT' && pendingStudentRaw) {
+            try {
+              const studentData = JSON.parse(pendingStudentRaw);
+              await fetchApi('/students/profile', {
+                method: 'POST',
+                body: JSON.stringify({
+                  userId: user.id,
+                  fullName: studentData.fullName,
+                  headline: studentData.headline,
+                  bio: studentData.bio,
+                  socialLinks: {
+                    linkedin: studentData.linkedin,
+                  },
+                }),
+              });
+            } catch (err) {
+              console.warn('Could not save pending student data:', err);
+            }
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('xerty_pending_role');
+              localStorage.removeItem('xerty_pending_student_data');
+            }
+          }
 
           if (dbUser?.solanaAddress) {
             setSolanaAddress(dbUser.solanaAddress);
@@ -89,17 +152,28 @@ export function useAuth() {
           }
 
           if (typeof window !== 'undefined') {
-            const hasCompletedIssuer = !!dbUser?.issuerProfile?.academyName;
-            const hasCompletedStudent = !!dbUser?.studentProfile?.fullName;
+            const hasIssuerProfile = !!dbUser?.issuerProfile?.academyName;
+            const hasStudentProfile = !!dbUser?.studentProfile?.fullName || !!dbUser?.studentProfile?.headline;
+            const isStrictIssuer = dbUser?.role === 'ISSUER' || hasIssuerProfile || pendingRole === 'ISSUER';
+            const isStrictStudent =
+              (!isStrictIssuer && (dbUser?.role === 'STUDENT' || hasStudentProfile)) || pendingRole === 'STUDENT';
 
-            if (dbUser?.role === 'ISSUER' && hasCompletedIssuer) {
+            if (isStrictIssuer) {
               setUserRole('ISSUER');
               localStorage.setItem('xerty_user_role', 'ISSUER');
               localStorage.setItem('xerty_onboarding_completed', 'true');
-            } else if (dbUser?.role === 'STUDENT' && hasCompletedStudent) {
+
+              if (pathname === '/' || pathname === '/onboarding') {
+                router.push('/issuer');
+              }
+            } else if (isStrictStudent) {
               setUserRole('STUDENT');
               localStorage.setItem('xerty_user_role', 'STUDENT');
               localStorage.setItem('xerty_onboarding_completed', 'true');
+
+              if (pathname === '/' || pathname === '/onboarding') {
+                router.push('/student');
+              }
             }
           }
         } catch (error) {
@@ -116,7 +190,7 @@ export function useAuth() {
       }
     }
 
-    if (ready && authenticated && user?.id) {
+    if (ready && authenticated && user?.wallet?.address) {
       syncUserWithBackend();
     }
   }, [ready, authenticated, user?.wallet?.address, user?.id]);

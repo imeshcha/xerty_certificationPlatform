@@ -9,6 +9,7 @@ import {
   Building2,
   GraduationCap,
   ArrowRight,
+  ArrowLeft,
   Check,
   Sparkles,
   Lock,
@@ -18,7 +19,6 @@ import {
   User as UserIcon,
   Wallet,
   CheckCircle2,
-  Briefcase,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -38,58 +38,32 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Issuer Form Data (Comprehensive)
+  // Issuer Form Data
   const [issuerForm, setIssuerForm] = useState({
-    fullName: '',
-    roleInInstitute: '',
     academyName: '',
     slug: '',
     website: '',
     contactEmail: '',
-    web3Address: '',
     description: '',
   });
 
-  // Student Form Data (Comprehensive)
+  // Student Form Data
   const [studentForm, setStudentForm] = useState({
     fullName: '',
     headline: '',
-    contactEmail: '',
-    web3Address: '',
-    linkedin: '',
     bio: '',
+    linkedin: '',
   });
 
-  // Read saved selected role from localStorage if any
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('xerty_selected_role') as 'ISSUER' | 'STUDENT' | null;
-      if (saved && !selectedRole) {
-        setSelectedRole(saved);
-      }
-    }
-  }, [selectedRole]);
-
-  // Pre-fill email, name, and web3 wallet address once authenticated
+  // Pre-fill email or name if Privy authenticated
   useEffect(() => {
     if (authenticated && user) {
-      const userEmail = user.email?.address || '';
-      const userWallet = user.wallet?.address || '';
-      const userName = user.google?.name || user.apple?.email || '';
-
-      setIssuerForm((prev) => ({
-        ...prev,
-        fullName: prev.fullName || userName,
-        contactEmail: prev.contactEmail || userEmail,
-        web3Address: prev.web3Address || userWallet,
-      }));
-
-      setStudentForm((prev) => ({
-        ...prev,
-        fullName: prev.fullName || userName,
-        contactEmail: prev.contactEmail || userEmail,
-        web3Address: prev.web3Address || userWallet,
-      }));
+      if (user.email?.address && !issuerForm.contactEmail) {
+        setIssuerForm((prev) => ({ ...prev, contactEmail: user.email?.address || '' }));
+      }
+      if ((user.google?.name || user.apple?.email) && !studentForm.fullName) {
+        setStudentForm((prev) => ({ ...prev, fullName: user.google?.name || '' }));
+      }
     }
   }, [authenticated, user]);
 
@@ -104,13 +78,14 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       localStorage.setItem('xerty_selected_role', role);
     }
 
+    // If not yet authenticated, launch Privy login immediately
     if (!authenticated) {
       try {
         if (privy?.login) {
           await privy.login();
         }
       } catch (err: any) {
-        console.warn('Privy login modal closed:', err?.message || err);
+        console.warn('Privy login popup closed or failed:', err?.message || err);
       }
     }
   };
@@ -136,10 +111,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         issuerForm.slug ||
         issuerForm.academyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-      const walletAddr =
-        issuerForm.web3Address ||
-        user?.wallet?.address ||
-        '0x0000000000000000000000000000000000000000';
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
       // 1. Sync User with MongoDB as ISSUER
@@ -150,7 +122,6 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
           walletAddress: walletAddr,
           authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
           email: issuerForm.contactEmail || user?.email?.address,
-          fullName: issuerForm.fullName,
           role: 'ISSUER',
         }),
       });
@@ -160,8 +131,6 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         method: 'POST',
         body: JSON.stringify({
           userId: userId,
-          fullName: issuerForm.fullName,
-          roleInInstitute: issuerForm.roleInInstitute,
           academyName: issuerForm.academyName,
           slug: generatedSlug,
           onchainIssuerAddress: walletAddr,
@@ -183,6 +152,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
       router.push('/issuer');
     } catch (err: any) {
       console.error('Failed to complete issuer registration:', err);
+      // Fallback
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'ISSUER');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -200,10 +170,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
     setErrorMessage('');
 
     try {
-      const walletAddr =
-        studentForm.web3Address ||
-        user?.wallet?.address ||
-        '0x0000000000000000000000000000000000000000';
+      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
       // 1. Sync User with MongoDB as STUDENT
@@ -213,7 +180,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
           privyUserId: userId,
           walletAddress: walletAddr,
           authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
-          email: studentForm.contactEmail || user?.email?.address,
+          email: user?.email?.address,
           fullName: studentForm.fullName,
           role: 'STUDENT',
         }),
@@ -254,10 +221,10 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
     }
   };
 
-  // Determine current active view:
-  // View 1: Select Role
-  // View 2: Login Options Trigger
-  // View 3: Fill Account Information Form
+  // Check which step to render:
+  // Step A: Not selected a role yet -> Role Cards
+  // Step B: Role selected but not logged in -> Prompt to connect
+  // Step C: Role selected AND logged in -> Fill Information Form
   const showRoleSelection = !selectedRole;
   const showLoginPrompt = selectedRole && !authenticated;
   const showInfoForm = selectedRole && authenticated;
@@ -280,22 +247,22 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         <div className="text-center space-y-2 mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
             <Sparkles className="h-3.5 w-3.5" />
-            Xerty Web3 Platform
+            Xerty Web3 Platform Access
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             {showRoleSelection && 'Select Your Account Type'}
             {showLoginPrompt && `Sign In to Continue as ${selectedRole === 'ISSUER' ? 'Institution' : 'Student'}`}
             {showInfoForm &&
               (selectedRole === 'ISSUER'
-                ? 'Educational Institution Account Details'
-                : 'Student Account Details')}
+                ? 'Complete Institution Account Information'
+                : 'Complete Student Account Information')}
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
             {showRoleSelection &&
               'Choose whether you are issuing academic credentials or receiving certificates.'}
-            {showLoginPrompt && 'Connect with your Web3 wallet, Email, Google, or Social account.'}
+            {showLoginPrompt && 'Connect with your Web3 wallet, Email, or Social account.'}
             {showInfoForm &&
-              'Please provide your details below to save and complete your account creation.'}
+              'Fill in your profile details to finalize your account and access your dashboard.'}
           </p>
         </div>
 
@@ -426,7 +393,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 2: PROMPT LOGIN (IF POPUP WAS CANCELLED OR CLOSED)                   */}
+        {/* STEP 2: PROMPT LOGIN (IF POPUP WAS CLOSED)                                */}
         {/* ========================================================================= */}
         {showLoginPrompt && (
           <div className="max-w-md mx-auto text-center space-y-6 py-6">
@@ -435,7 +402,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
             </div>
             <div className="space-y-2">
               <h3 className="text-lg font-bold">
-                Initialize Login for {selectedRole === 'ISSUER' ? 'Institution' : 'Student'} Account
+                Initialize Login for {selectedRole === 'ISSUER' ? 'Issuer' : 'Student'} Account
               </h3>
               <p className="text-xs text-muted-foreground">
                 Click below to select your login method (Web3 Wallet, Google, Apple, or Email).
@@ -461,7 +428,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         {/* STEP 3A: ISSUER INFORMATION FORM (AFTER LOGIN INITIALIZED)                */}
         {/* ========================================================================= */}
         {showInfoForm && selectedRole === 'ISSUER' && (
-          <div className="max-w-2xl mx-auto space-y-5">
+          <div className="max-w-xl mx-auto space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1.5 text-xs text-green-500 font-medium bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
@@ -477,45 +444,10 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
             </div>
 
             <form onSubmit={handleCompleteIssuerAccount} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Full Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <UserIcon className="h-3.5 w-3.5 text-primary" />
-                    Your Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="e.g. Dr. Alex Johnson"
-                    value={issuerForm.fullName}
-                    onChange={(e) => setIssuerForm({ ...issuerForm, fullName: e.target.value })}
-                  />
-                </div>
-
-                {/* Role in Institute */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Briefcase className="h-3.5 w-3.5 text-primary" />
-                    Role in Institute <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="e.g. Dean, Program Director, Admin"
-                    value={issuerForm.roleInInstitute}
-                    onChange={(e) => setIssuerForm({ ...issuerForm, roleInInstitute: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Institute / Academy Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 text-primary" />
-                  Institute / Academy Name <span className="text-destructive">*</span>
+                  Academy / Organization Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   required
@@ -534,7 +466,6 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Public Slug / Handle */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase text-muted-foreground">
                     Public Handle / Slug <span className="text-destructive">*</span>
@@ -548,55 +479,35 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
                     onChange={(e) => setIssuerForm({ ...issuerForm, slug: e.target.value })}
                   />
                 </div>
-
-                {/* Official Contact Email */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-primary" />
-                    Official Contact Email <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="admin@academy.edu"
-                    value={issuerForm.contactEmail}
-                    onChange={(e) => setIssuerForm({ ...issuerForm, contactEmail: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Web3 Address */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1">
-                    <Wallet className="h-3.5 w-3.5 text-primary" /> Web3 Address (if have)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="0x... (Optional)"
-                    value={issuerForm.web3Address}
-                    onChange={(e) => setIssuerForm({ ...issuerForm, web3Address: e.target.value })}
-                  />
-                </div>
-
-                {/* Website */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1">
-                    <Globe className="h-3.5 w-3.5 text-primary" /> Website (if have)
+                    <Globe className="h-3.5 w-3.5 text-primary" /> Official Website
                   </label>
                   <input
                     type="url"
                     className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="https://academy.edu (Optional)"
+                    placeholder="https://academy.edu"
                     value={issuerForm.website}
                     onChange={(e) => setIssuerForm({ ...issuerForm, website: e.target.value })}
                   />
                 </div>
               </div>
 
-              {/* Organization Bio / Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-primary" />
+                  Official Contact Email <span className="text-destructive">*</span>
+                </label>
+                <input
+                  required
+                  type="email"
+                  className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="admin@academy.edu"
+                  value={issuerForm.contactEmail}
+                  onChange={(e) => setIssuerForm({ ...issuerForm, contactEmail: e.target.value })}
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground">
                   Organization Bio / Description
@@ -614,7 +525,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
 
               <div className="pt-2">
                 <Button type="submit" className="w-full font-bold h-11 text-sm shadow-lg" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving & Creating Profile...' : 'Save & Complete Issuer Account Creation →'}
+                  {isSubmitting ? 'Saving & Finalizing...' : 'Save & Complete Issuer Account Creation →'}
                 </Button>
               </div>
             </form>
@@ -625,7 +536,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
         {/* STEP 3B: STUDENT INFORMATION FORM (AFTER LOGIN INITIALIZED)               */}
         {/* ========================================================================= */}
         {showInfoForm && selectedRole === 'STUDENT' && (
-          <div className="max-w-2xl mx-auto space-y-5">
+          <div className="max-w-xl mx-auto space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1.5 text-xs text-green-500 font-medium bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20">
@@ -641,92 +552,51 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
             </div>
 
             <form onSubmit={handleCompleteStudentAccount} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Full Legal Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
-                    Full Legal Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="e.g. Alice Doe"
-                    value={studentForm.fullName}
-                    onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
-                  />
-                </div>
-
-                {/* Personal Basic Info / Headline */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Briefcase className="h-3.5 w-3.5 text-emerald-500" />
-                    Basic Info / Headline <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="e.g. CS Student & Web3 Developer"
-                    value={studentForm.headline}
-                    onChange={(e) => setStudentForm({ ...studentForm, headline: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                  <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
+                  Full Legal Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="e.g. Alice Doe"
+                  value={studentForm.fullName}
+                  onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
+                />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Contact Email */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-emerald-500" />
-                    Contact Email <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="alice@student.edu"
-                    value={studentForm.contactEmail}
-                    onChange={(e) => setStudentForm({ ...studentForm, contactEmail: e.target.value })}
-                  />
-                </div>
-
-                {/* Web3 Address */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Wallet className="h-3.5 w-3.5 text-emerald-500" />
-                    Web3 Address (if have)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="0x... (Optional)"
-                    value={studentForm.web3Address}
-                    onChange={(e) => setStudentForm({ ...studentForm, web3Address: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase text-muted-foreground">
+                  Professional Headline
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="e.g. Full-Stack Web3 Developer"
+                  value={studentForm.headline}
+                  onChange={(e) => setStudentForm({ ...studentForm, headline: e.target.value })}
+                />
               </div>
 
-              {/* LinkedIn URL */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                   <Globe className="h-3.5 w-3.5 text-emerald-500" />
-                  LinkedIn Profile URL (Optional)
+                  LinkedIn Profile URL
                 </label>
                 <input
                   type="url"
                   className="w-full rounded-lg border bg-background px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="https://linkedin.com/in/alicedoe (Optional)"
+                  placeholder="https://linkedin.com/in/alicedoe"
                   value={studentForm.linkedin}
                   onChange={(e) => setStudentForm({ ...studentForm, linkedin: e.target.value })}
                 />
               </div>
 
-              {/* Personal Bio */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted-foreground">
-                  Personal Bio / Academic Goals
+                  Personal Bio / Goals
                 </label>
                 <textarea
                   rows={2}
@@ -745,7 +615,7 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
                   className="w-full font-bold h-11 text-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Saving & Creating Student Vault...' : 'Save & Complete Student Account Creation →'}
+                  {isSubmitting ? 'Saving & Finalizing...' : 'Save & Complete Student Account Creation →'}
                 </Button>
               </div>
             </form>
