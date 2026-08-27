@@ -16,6 +16,8 @@ import {
   Mail,
   User as UserIcon,
   CheckCircle2,
+  Briefcase,
+  Wallet,
 } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 
@@ -30,32 +32,48 @@ export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Issuer Form Data
+  // Issuer Form Data (Comprehensive)
   const [issuerForm, setIssuerForm] = useState({
+    fullName: '',
+    roleInInstitute: '',
     academyName: '',
     slug: '',
     website: '',
     contactEmail: '',
+    web3Address: '',
     description: '',
   });
 
-  // Student Form Data
+  // Student Form Data (Comprehensive)
   const [studentForm, setStudentForm] = useState({
     fullName: '',
     headline: 'Web3 Learner & Developer',
+    contactEmail: '',
+    web3Address: '',
     bio: '',
     linkedin: '',
   });
 
-  // Pre-fill email/name if logged in
+  // Pre-fill email, wallet, and name once authenticated
   useEffect(() => {
     if (authenticated && user) {
-      if (user.email?.address && !issuerForm.contactEmail) {
-        setIssuerForm((prev) => ({ ...prev, contactEmail: user.email?.address || '' }));
-      }
-      if ((user.google?.name || user.apple?.email) && !studentForm.fullName) {
-        setStudentForm((prev) => ({ ...prev, fullName: user.google?.name || '' }));
-      }
+      const userEmail = user.email?.address || '';
+      const userWallet = user.wallet?.address || '';
+      const userName = user.google?.name || user.apple?.email || '';
+
+      setIssuerForm((prev) => ({
+        ...prev,
+        fullName: prev.fullName || userName,
+        contactEmail: prev.contactEmail || userEmail,
+        web3Address: prev.web3Address || userWallet,
+      }));
+
+      setStudentForm((prev) => ({
+        ...prev,
+        fullName: prev.fullName || userName,
+        contactEmail: prev.contactEmail || userEmail,
+        web3Address: prev.web3Address || userWallet,
+      }));
     }
   }, [authenticated, user]);
 
@@ -63,7 +81,6 @@ export default function OnboardingPage() {
     setSelectedRole(role);
     setErrorMessage('');
 
-    // If not authenticated, prompt login options immediately
     if (!authenticated) {
       try {
         if (privy?.login) {
@@ -85,7 +102,10 @@ export default function OnboardingPage() {
         issuerForm.slug ||
         issuerForm.academyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const walletAddr =
+        issuerForm.web3Address ||
+        user?.wallet?.address ||
+        '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
       // 1. Sync role as ISSUER
@@ -97,6 +117,7 @@ export default function OnboardingPage() {
           authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
           role: 'ISSUER',
           email: issuerForm.contactEmail || user?.email?.address,
+          fullName: issuerForm.fullName,
         }),
       });
 
@@ -105,6 +126,8 @@ export default function OnboardingPage() {
         method: 'POST',
         body: JSON.stringify({
           userId: userId,
+          fullName: issuerForm.fullName,
+          roleInInstitute: issuerForm.roleInInstitute,
           academyName: issuerForm.academyName,
           slug: generatedSlug,
           onchainIssuerAddress: walletAddr,
@@ -140,7 +163,10 @@ export default function OnboardingPage() {
     setErrorMessage('');
 
     try {
-      const walletAddr = user?.wallet?.address || '0x0000000000000000000000000000000000000000';
+      const walletAddr =
+        studentForm.web3Address ||
+        user?.wallet?.address ||
+        '0x0000000000000000000000000000000000000000';
       const userId = user?.id || 'temp_user_id';
 
       // 1. Sync role as STUDENT
@@ -151,7 +177,7 @@ export default function OnboardingPage() {
           walletAddress: walletAddr,
           authProvider: user?.linkedAccounts?.[0]?.type?.toUpperCase() || 'WALLET',
           role: 'STUDENT',
-          email: user?.email?.address,
+          email: studentForm.contactEmail || user?.email?.address,
           fullName: studentForm.fullName,
         }),
       });
@@ -202,8 +228,8 @@ export default function OnboardingPage() {
             : !authenticated
             ? 'Sign In to Proceed'
             : selectedRole === 'ISSUER'
-            ? 'Complete Institution Account Information'
-            : 'Complete Student Account Information'}
+            ? 'Educational Institution Account Details'
+            : 'Student Account Details'}
         </h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {!selectedRole && 'Select whether you are issuing academic credentials or receiving certificates.'}
@@ -354,10 +380,45 @@ export default function OnboardingPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleIssuerSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <UserIcon className="h-3.5 w-3.5 text-primary" />
+                    Your Name <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="e.g. Dr. Alex Johnson"
+                    value={issuerForm.fullName}
+                    onChange={(e) => setIssuerForm({ ...issuerForm, fullName: e.target.value })}
+                  />
+                </div>
+
+                {/* Role in Institute */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Briefcase className="h-3.5 w-3.5 text-primary" />
+                    Role in Institute <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="e.g. Dean, Program Director, Admin"
+                    value={issuerForm.roleInInstitute}
+                    onChange={(e) => setIssuerForm({ ...issuerForm, roleInInstitute: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Institute / Academy Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
                   <Building2 className="h-3.5 w-3.5 text-primary" />
-                  Academy / Organization Name <span className="text-destructive">*</span>
+                  Institute / Academy Name <span className="text-destructive">*</span>
                 </label>
                 <input
                   required
@@ -375,7 +436,8 @@ export default function OnboardingPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Public Slug / Handle */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase text-muted-foreground">
                     Public Handle / Slug <span className="text-destructive">*</span>
@@ -389,6 +451,40 @@ export default function OnboardingPage() {
                     onChange={(e) => setIssuerForm({ ...issuerForm, slug: e.target.value })}
                   />
                 </div>
+
+                {/* Official Contact Email */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-primary" />
+                    Official Contact Email <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="email"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="contact@academy.edu"
+                    value={issuerForm.contactEmail}
+                    onChange={(e) => setIssuerForm({ ...issuerForm, contactEmail: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Web3 Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Wallet className="h-3.5 w-3.5 text-primary" /> Web3 Address (if have)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="0x... (Optional)"
+                    value={issuerForm.web3Address}
+                    onChange={(e) => setIssuerForm({ ...issuerForm, web3Address: e.target.value })}
+                  />
+                </div>
+
+                {/* Website */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
                     <Globe className="h-3.5 w-3.5 text-primary" /> Official Website
@@ -396,7 +492,7 @@ export default function OnboardingPage() {
                   <input
                     type="url"
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                    placeholder="https://academy.edu"
+                    placeholder="https://academy.edu (Optional)"
                     value={issuerForm.website}
                     onChange={(e) => setIssuerForm({ ...issuerForm, website: e.target.value })}
                   />
@@ -404,24 +500,9 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5 text-primary" />
-                  Official Contact Email <span className="text-destructive">*</span>
-                </label>
-                <input
-                  required
-                  type="email"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="contact@academy.edu"
-                  value={issuerForm.contactEmail}
-                  onChange={(e) => setIssuerForm({ ...issuerForm, contactEmail: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase text-muted-foreground">Organization Bio</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   placeholder="Brief description of your certification programs..."
                   value={issuerForm.description}
@@ -462,41 +543,82 @@ export default function OnboardingPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleStudentSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
-                  <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
-                  Full Legal Name <span className="text-destructive">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="e.g. Alice Doe"
-                  value={studentForm.fullName}
-                  onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <UserIcon className="h-3.5 w-3.5 text-emerald-500" />
+                    Full Legal Name <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="e.g. Alice Doe"
+                    value={studentForm.fullName}
+                    onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
+                  />
+                </div>
+
+                {/* Headline */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Briefcase className="h-3.5 w-3.5 text-emerald-500" />
+                    Basic Info / Headline <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="e.g. Full-Stack Web3 Developer"
+                    value={studentForm.headline}
+                    onChange={(e) => setStudentForm({ ...studentForm, headline: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">Professional Headline</label>
-                <input
-                  type="text"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="e.g. Full-Stack Web3 Developer"
-                  value={studentForm.headline}
-                  onChange={(e) => setStudentForm({ ...studentForm, headline: e.target.value })}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Contact Email */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-emerald-500" />
+                    Contact Email <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    required
+                    type="email"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="alice@student.edu"
+                    value={studentForm.contactEmail}
+                    onChange={(e) => setStudentForm({ ...studentForm, contactEmail: e.target.value })}
+                  />
+                </div>
+
+                {/* Web3 Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
+                    <Wallet className="h-3.5 w-3.5 text-emerald-500" />
+                    Web3 Address (if have)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="0x... (Optional)"
+                    value={studentForm.web3Address}
+                    onChange={(e) => setStudentForm({ ...studentForm, web3Address: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-1">
                   <Globe className="h-3.5 w-3.5 text-emerald-500" />
-                  LinkedIn Profile URL
+                  LinkedIn Profile URL (Optional)
                 </label>
                 <input
                   type="url"
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="https://linkedin.com/in/alicedoe"
+                  placeholder="https://linkedin.com/in/alicedoe (Optional)"
                   value={studentForm.linkedin}
                   onChange={(e) => setStudentForm({ ...studentForm, linkedin: e.target.value })}
                 />

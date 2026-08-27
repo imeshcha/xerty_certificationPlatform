@@ -97,6 +97,8 @@ export class UsersService {
   async updateIssuerProfile(
     identifier: { userId?: string; walletAddress?: string },
     profileData: {
+      fullName?: string;
+      roleInInstitute?: string;
       academyName?: string;
       slug?: string;
       website?: string;
@@ -118,18 +120,23 @@ export class UsersService {
       throw new ForbiddenException('Strict Access: Student accounts cannot create an Issuer profile or access the Issuer portal.');
     }
 
+    const setPayload: any = {
+      role: UserRole.ISSUER,
+      isRoleLocked: true,
+      issuerProfile: {
+        ...profileData,
+        isVerified: false,
+      },
+    };
+    if (profileData.fullName) {
+      setPayload.fullName = profileData.fullName;
+    }
+
     const updated = await this.userModel
       .findOneAndUpdate(
         query,
         {
-          $set: {
-            role: UserRole.ISSUER,
-            isRoleLocked: true,
-            issuerProfile: {
-              ...profileData,
-              isVerified: false,
-            },
-          },
+          $set: setPayload,
         },
         { new: true, upsert: true },
       )

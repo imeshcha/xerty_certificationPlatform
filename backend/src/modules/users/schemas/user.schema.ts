@@ -25,6 +25,12 @@ export enum AuthProvider {
 @Schema({ _id: false })
 export class IssuerProfileData {
   @Prop({ trim: true })
+  fullName?: string;
+
+  @Prop({ trim: true })
+  roleInInstitute?: string;
+
+  @Prop({ trim: true })
   academyName?: string;
 
   @Prop({ lowercase: true, trim: true })
