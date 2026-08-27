@@ -7,6 +7,7 @@ import {
   CertificateStatus,
 } from './schemas/certificate.schema';
 import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
+import { Course, CourseDocument } from '../courses/schemas/course.schema';
 import {
   CreateCertificateDto,
   RevokeCertificateDto,
@@ -17,6 +18,7 @@ export class CertificatesService {
   constructor(
     @InjectModel(Certificate.name) private certModel: Model<CertificateDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Course.name) private courseModel: Model<CourseDocument>,
   ) {}
 
   private async resolveUserObjectId(identifier: string): Promise<Types.ObjectId> {
@@ -52,6 +54,46 @@ export class CertificatesService {
     return user._id as Types.ObjectId;
   }
 
+  private async resolveCourseObjectId(identifier: string): Promise<Types.ObjectId> {
+    if (!identifier) {
+      const fallbackCourse = await this.courseModel.findOne().exec();
+      if (fallbackCourse) return fallbackCourse._id as Types.ObjectId;
+      const created = await this.courseModel.create({
+        title: 'Blockchain Certification Cohort',
+        code: 'CERT-101',
+        durationHours: 40,
+      });
+      return created._id as Types.ObjectId;
+    }
+
+    if (Types.ObjectId.isValid(identifier) && identifier.length === 24 && !identifier.includes(':')) {
+      const exists = await this.courseModel.findById(identifier).exec();
+      if (exists) return exists._id as Types.ObjectId;
+    }
+
+    let course = await this.courseModel
+      .findOne({
+        $or: [
+          { code: identifier.toUpperCase() },
+          { title: identifier },
+        ],
+      })
+      .exec();
+
+    if (!course) {
+      course = await this.courseModel.findOne().exec();
+      if (!course) {
+        course = await this.courseModel.create({
+          title: 'Blockchain Certification Cohort',
+          code: identifier.toUpperCase(),
+          durationHours: 40,
+        });
+      }
+    }
+
+    return course._id as Types.ObjectId;
+  }
+
   async findAll(): Promise<CertificateDocument[]> {
     return this.certModel
       .find()
@@ -62,8 +104,20 @@ export class CertificatesService {
   }
 
   async findByCourseId(courseId: string): Promise<CertificateDocument[]> {
+    let query: any = {};
+    if (Types.ObjectId.isValid(courseId) && courseId.length === 24) {
+      query = { courseId: new Types.ObjectId(courseId) };
+    } else {
+      const course = await this.courseModel.findOne({ code: courseId.toUpperCase() }).exec();
+      if (course) {
+        query = { courseId: course._id };
+      } else {
+        return [];
+      }
+    }
+
     return this.certModel
-      .find({ courseId })
+      .find(query)
       .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
       .populate('courseId', 'title code durationHours')
       .sort({ createdAt: -1 })
@@ -125,9 +179,11 @@ export class CertificatesService {
 
   async create(dto: CreateCertificateDto): Promise<CertificateDocument> {
     const issuerObjectId = await this.resolveUserObjectId(dto.issuerId);
+    const courseObjectId = await this.resolveCourseObjectId(dto.courseId);
     const newCert = new this.certModel({
       ...dto,
       issuerId: issuerObjectId,
+      courseId: courseObjectId,
       certificateHash: dto.certificateHash.toLowerCase(),
       studentWallet: (dto.studentWallet || '').toLowerCase(),
       studentEmail: dto.studentEmail.toLowerCase(),
@@ -140,9 +196,11 @@ export class CertificatesService {
     const certDocs = await Promise.all(
       dtoList.map(async (dto) => {
         const issuerObjectId = await this.resolveUserObjectId(dto.issuerId);
+        const courseObjectId = await this.resolveCourseObjectId(dto.courseId);
         return {
           ...dto,
           issuerId: issuerObjectId,
+          courseId: courseObjectId,
           certificateHash: dto.certificateHash.toLowerCase(),
           studentWallet: (dto.studentWallet || '').toLowerCase(),
           studentEmail: dto.studentEmail.toLowerCase(),

@@ -67,8 +67,8 @@ export class Certificate {
   @Prop({ required: true, default: Date.now, index: true })
   issueDate: Date;
 
-  @Prop({ required: true, index: true, trim: true })
-  studentWallet: string;
+  @Prop({ required: false, default: '', index: true, trim: true })
+  studentWallet?: string;
 
   @Prop({ required: true, lowercase: true, index: true, trim: true })
   studentEmail: string;
