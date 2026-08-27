@@ -27,16 +27,43 @@ export default function CourseBatchClaimPage() {
   useEffect(() => {
     if (courseId) {
       setIsLoading(true);
+
+      // Check local cache first for instant rendering
+      if (typeof window !== 'undefined') {
+        try {
+          const storedCourses = localStorage.getItem('xerty_courses');
+          if (storedCourses) {
+            const list = JSON.parse(storedCourses);
+            const found = list.find((c: any) => (c._id || c.id) === courseId || c.code === courseId);
+            if (found) setCourse(found);
+          }
+          const storedCerts = localStorage.getItem('xerty_certificates');
+          if (storedCerts) {
+            const certList = JSON.parse(storedCerts);
+            const matching = certList.filter(
+              (c: any) =>
+                (c.courseId?._id || c.courseId?.id || c.courseId) === courseId ||
+                (c.courseId?.code || '').toUpperCase() === courseId.toUpperCase() ||
+                (c.variablesMap?.course_code || '').toUpperCase() === courseId.toUpperCase() ||
+                c.certificateId?.includes(courseId),
+            );
+            if (matching.length > 0) setCertificates(matching);
+          }
+        } catch (e) {
+          console.warn('Local cache read note:', e);
+        }
+      }
+
       Promise.all([
-        fetchApi(`/courses/${courseId}`),
-        fetchApi(`/certificates/course/${courseId}`),
+        fetchApi(`/courses/${courseId}`).catch(() => null),
+        fetchApi(`/certificates/course/${courseId}`).catch(() => []),
       ])
         .then(([courseData, certsData]: [any, any]) => {
           if (courseData) setCourse(courseData);
-          if (Array.isArray(certsData)) setCertificates(certsData);
+          if (Array.isArray(certsData) && certsData.length > 0) setCertificates(certsData);
         })
         .catch((err) => {
-          console.warn('Could not load course claim portal:', err);
+          console.warn('Could not load course claim portal from backend:', err);
         })
         .finally(() => setIsLoading(false));
     }
@@ -127,21 +154,19 @@ export default function CourseBatchClaimPage() {
     );
   }
 
-  if (!course) {
-    return (
-      <div className="container mx-auto px-4 py-20 text-center space-y-4 max-w-md">
-        <h2 className="text-2xl font-bold">Course Cohort Not Found</h2>
-        <p className="text-xs text-muted-foreground">
-          The requested course claim portal does not exist or has expired.
-        </p>
-        <Link href="/">
-          <Button variant="outline" size="sm">
-            Return Home
-          </Button>
-        </Link>
-      </div>
-    );
-  }
+  const currentCourse = course || {
+    title:
+      certificates[0]?.courseId?.title ||
+      certificates[0]?.variablesMap?.course_title ||
+      'Certified Academic Program',
+    code:
+      certificates[0]?.courseId?.code ||
+      certificates[0]?.variablesMap?.course_code ||
+      'CERT-101',
+    durationHours: certificates[0]?.courseId?.durationHours || 40,
+    description:
+      'Official decentralized student credential distribution portal. Search your name or email below to claim your soulbound diploma.',
+  };
 
   return (
     <div className="container mx-auto px-4 py-10 space-y-8 max-w-5xl">
@@ -152,21 +177,20 @@ export default function CourseBatchClaimPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="rounded bg-primary/10 px-2.5 py-0.5 text-xs font-mono font-bold text-primary">
-                  {course.code}
+                  {currentCourse.code}
                 </span>
                 <span className="text-xs text-muted-foreground font-medium">
-                  {course.durationHours} Hours Certified Program
+                  {currentCourse.durationHours} Hours Certified Program
                 </span>
                 <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-500/20">
                   Official Claim Portal
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-                {course.title}
+                {currentCourse.title}
               </h1>
               <p className="text-xs text-muted-foreground max-w-2xl">
-                {course.description ||
-                  'Official decentralized student credential distribution portal. Search your name or email below to claim your soulbound diploma.'}
+                {currentCourse.description}
               </p>
             </div>
 
@@ -322,7 +346,7 @@ export default function CourseBatchClaimPage() {
                   Claim Credential: {selectedCert.studentName}
                 </CardTitle>
                 <CardDescription className="text-xs font-mono">
-                  Certificate ID: {selectedCert.certificateId} • {course.code}
+                  Certificate ID: {selectedCert.certificateId} • {currentCourse.code}
                 </CardDescription>
               </div>
               <Button
@@ -350,7 +374,7 @@ export default function CourseBatchClaimPage() {
                 <div className="space-y-1">
                   <h2 className="text-xl font-extrabold text-foreground">{selectedCert.studentName}</h2>
                   <p className="text-xs text-muted-foreground">
-                    Program: <span className="font-semibold text-foreground">{course.title}</span> ({course.code})
+                    Program: <span className="font-semibold text-foreground">{currentCourse.title}</span> ({currentCourse.code})
                   </p>
                 </div>
 

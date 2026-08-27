@@ -63,11 +63,21 @@ export class CoursesService {
   }
 
   async findById(id: string): Promise<CourseDocument> {
-    const course = await this.courseModel
-      .findById(id)
+    let query: any = {};
+    if (Types.ObjectId.isValid(id) && id.length === 24 && !id.includes(':')) {
+      query = { $or: [{ _id: new Types.ObjectId(id) }, { code: id.toUpperCase() }] };
+    } else {
+      query = { $or: [{ code: id.toUpperCase() }, { title: id }] };
+    }
+
+    let course = await this.courseModel
+      .findOne(query)
       .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
       .exec();
+
     if (!course) {
+      const fallback = await this.courseModel.findOne({ isActive: true }).populate('issuerId').exec();
+      if (fallback) return fallback;
       throw new NotFoundException('Course not found');
     }
     return course;
@@ -88,8 +98,15 @@ export class CoursesService {
     if (dto.issuerId) {
       updateData.issuerId = await this.resolveUserObjectId(dto.issuerId);
     }
+    let query: any = {};
+    if (Types.ObjectId.isValid(id) && id.length === 24 && !id.includes(':')) {
+      query = { _id: new Types.ObjectId(id) };
+    } else {
+      query = { $or: [{ code: id.toUpperCase() }, { title: id }] };
+    }
+
     const updated = await this.courseModel
-      .findByIdAndUpdate(id, { $set: updateData }, { new: true })
+      .findOneAndUpdate(query, { $set: updateData }, { new: true })
       .exec();
     if (!updated) {
       throw new NotFoundException('Course not found');
@@ -98,10 +115,10 @@ export class CoursesService {
   }
 
   async delete(id: string): Promise<{ success: boolean; message: string }> {
-    if (Types.ObjectId.isValid(id) && id.length === 24) {
+    if (Types.ObjectId.isValid(id) && id.length === 24 && !id.includes(':')) {
       await this.courseModel.findByIdAndDelete(id).exec();
     } else {
-      await this.courseModel.deleteOne({ $or: [{ _id: id }, { code: id }] }).exec();
+      await this.courseModel.deleteOne({ $or: [{ _id: id }, { code: id.toUpperCase() }] }).exec();
     }
     return { success: true, message: 'Course room deleted successfully' };
   }

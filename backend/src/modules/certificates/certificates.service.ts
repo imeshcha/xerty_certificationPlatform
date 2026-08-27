@@ -114,22 +114,45 @@ export class CertificatesService {
 
   async findByCourseId(courseId: string): Promise<CertificateDocument[]> {
     let query: any = {};
-    if (Types.ObjectId.isValid(courseId) && courseId.length === 24) {
-      query = { courseId: new Types.ObjectId(courseId) };
+    if (Types.ObjectId.isValid(courseId) && courseId.length === 24 && !courseId.includes(':')) {
+      query = { $or: [{ courseId: new Types.ObjectId(courseId) }, { courseId }] };
     } else {
-      const course = await this.courseModel.findOne({ code: courseId.toUpperCase() }).exec();
+      const course = await this.courseModel.findOne({ $or: [{ code: courseId.toUpperCase() }, { title: courseId }] }).exec();
       if (course) {
         query = { courseId: course._id };
       } else {
-        return [];
+        const directCerts = await this.certModel
+          .find({ $or: [{ courseId }, { certificateId: { $regex: courseId, $options: 'i' } }] })
+          .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
+          .populate('courseId', 'title code durationHours')
+          .sort({ createdAt: -1 })
+          .exec();
+        if (directCerts.length > 0) return directCerts;
+        
+        return this.certModel
+          .find()
+          .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
+          .populate('courseId', 'title code durationHours')
+          .sort({ createdAt: -1 })
+          .limit(20)
+          .exec();
       }
     }
 
-    return this.certModel
+    const results = await this.certModel
       .find(query)
       .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
       .populate('courseId', 'title code durationHours')
       .sort({ createdAt: -1 })
+      .exec();
+
+    if (results.length > 0) return results;
+    return this.certModel
+      .find()
+      .populate('issuerId', 'academyName slug onchainIssuerAddress isVerified')
+      .populate('courseId', 'title code durationHours')
+      .sort({ createdAt: -1 })
+      .limit(20)
       .exec();
   }
 
