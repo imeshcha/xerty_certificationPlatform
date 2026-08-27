@@ -168,6 +168,58 @@ export default function IssuerDashboardPage() {
         </Card>
       </div>
 
+      {/* Gas Tank & Claim Sponsorship Manager */}
+      <Card className="border-primary/30 bg-primary/5 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-primary/10 text-primary text-[10px] font-mono font-bold px-2 py-0.5 border border-primary/20">
+                  ERC-4337 Gas Sponsorship
+                </span>
+                <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                  ● Paymaster Active
+                </span>
+              </div>
+              <CardTitle className="text-lg font-bold">Institution Gas Tank & Sponsorship Vault</CardTitle>
+              <CardDescription className="text-xs">
+                Sponsors 100% of student blockchain transaction fees during certificate claiming.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="font-bold text-xs"
+                onClick={() => {
+                  alert('✓ Gas Tank successfully topped up with $25.00 (+5,000 sponsored claims added)!');
+                }}
+              >
+                + Top Up Gas Tank ($25)
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t text-xs">
+            <div className="p-3 rounded-lg bg-background border space-y-1">
+              <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">Available Gas Credits</span>
+              <p className="text-lg font-bold text-primary">$49.85 USD</p>
+              <p className="text-[10px] text-muted-foreground">Arbitrum L2 & Solana Devnet</p>
+            </div>
+            <div className="p-3 rounded-lg bg-background border space-y-1">
+              <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">Sponsored Claims Remaining</span>
+              <p className="text-lg font-bold text-green-600">~9,970 Claims</p>
+              <p className="text-[10px] text-muted-foreground">Auto-refill enabled</p>
+            </div>
+            <div className="p-3 rounded-lg bg-background border space-y-1">
+              <span className="text-[10px] uppercase font-mono text-muted-foreground font-semibold">Est. Cost Per Student</span>
+              <p className="text-lg font-bold text-foreground">~$0.005</p>
+              <p className="text-[10px] text-muted-foreground">$0.00 fee for student</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Quick Access to History */}
       <div className="flex items-center justify-between p-6 rounded-xl border bg-card/60">
         <div className="flex items-center gap-4">

@@ -5,6 +5,7 @@ import {
   CreateCertificateDto,
   RevokeCertificateDto,
 } from './dto/create-certificate.dto';
+import { RelayClaimDto, TopUpGasTankDto } from './dto/relay-claim.dto';
 
 @ApiTags('Certificates')
 @Controller('certificates')
@@ -92,5 +93,29 @@ export class CertificatesController {
     @Body() dto: RevokeCertificateDto,
   ) {
     return this.certificatesService.revoke(id, dto);
+  }
+
+  @Post('relay-claim')
+  @ApiOperation({ summary: 'Gasless meta-transaction student certificate claim' })
+  @ApiResponse({ status: 200, description: 'Certificate claimed on-chain with sponsored gas' })
+  async relayClaimCertificate(@Body() dto: RelayClaimDto) {
+    return this.certificatesService.relayClaim(dto);
+  }
+
+  @Get('issuer/:issuerId/gas-tank')
+  @ApiOperation({ summary: 'Get institution gas tank and sponsored claim credits' })
+  @ApiResponse({ status: 200, description: 'Gas tank status retrieved successfully' })
+  async getIssuerGasTank(@Param('issuerId') issuerId: string) {
+    return this.certificatesService.getGasTank(issuerId);
+  }
+
+  @Post('issuer/:issuerId/gas-tank/topup')
+  @ApiOperation({ summary: 'Top up institution gas tank balance' })
+  @ApiResponse({ status: 200, description: 'Gas tank topped up successfully' })
+  async topUpIssuerGasTank(
+    @Param('issuerId') issuerId: string,
+    @Body() body: TopUpGasTankDto,
+  ) {
+    return this.certificatesService.topUpGasTank(issuerId, body.amount || 25);
   }
 }

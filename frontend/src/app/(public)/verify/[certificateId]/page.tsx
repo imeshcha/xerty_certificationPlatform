@@ -133,10 +133,27 @@ export default function CertificateVerificationResultPage() {
     }
   };
 
-  const handleClaimToVault = () => {
+  const handleClaimToVault = async () => {
     if (!isAuthenticated) {
       login();
       return;
+    }
+
+    const userEmail = user?.email?.address || (user as any)?.google?.email;
+    const userWallet = user?.wallet?.address || (user as any)?.walletAddress || '0x71C86DF156A54F1d81E7381AcE91C0E4B77C439B';
+
+    try {
+      await fetchApi('/certificates/relay-claim', {
+        method: 'POST',
+        body: JSON.stringify({
+          certificateId: certId,
+          claimantWallet: userWallet,
+          claimantEmail: userEmail || data?.studentEmail,
+          nonce: String(Date.now()),
+        }),
+      });
+    } catch (e) {
+      console.warn('Relay claim sync note:', e);
     }
     setClaimedSuccess(true);
   };

@@ -103,6 +103,16 @@ export class User {
 
   @Prop({ type: StudentProfileData, default: {} })
   studentProfile?: StudentProfileData;
+
+  // Gas Tank & Issuance Sponsorship Pool
+  @Prop({ default: 50.0 })
+  gasCredits: number;
+
+  @Prop({ default: 500 })
+  sponsoredClaimsRemaining: number;
+
+  @Prop({ default: true })
+  autoTopUp: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
