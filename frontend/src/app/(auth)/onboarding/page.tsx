@@ -188,22 +188,6 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      {/* Strict Role Separation Notice Banner */}
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3 text-xs">
-        <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-bold text-foreground">Strict Role Separation Policy:</p>
-          <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-            <li>
-              <strong>Issuer Account:</strong> For Educational Institutions. You will manage courses and issue diplomas. You <u>cannot</u> access or create a student vault.
-            </li>
-            <li>
-              <strong>Student Account:</strong> For Learners and Recipients. You will claim and verify credentials. You <u>cannot</u> access or create an issuer portal.
-            </li>
-          </ul>
-        </div>
-      </div>
-
       {/* Step 1: Role Selection Cards */}
       {!selectedRole && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">

@@ -181,18 +181,6 @@ export function AuthModal({ isOpen, onClose, defaultRole = null }: AuthModalProp
           </p>
         </div>
 
-        {/* Strict Role Policy Warning */}
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 sm:p-4 mb-6 flex items-start gap-3 text-xs">
-          <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-bold text-foreground">Strict Account Separation Policy:</p>
-            <p className="text-muted-foreground">
-              • <strong>Issuer accounts</strong> can create courses and issue certificates, but <u>cannot</u> create a student account or access student vault.<br />
-              • <strong>Student accounts</strong> can hold and claim credentials, but <u>cannot</u> create an issuer account or access the issuer studio.
-            </p>
-          </div>
-        </div>
-
         {/* ========================================================================= */}
         {/* STEP 1: ROLE SELECTION CARDS (2 COLUMNS)                                   */}
         {/* ========================================================================= */}
