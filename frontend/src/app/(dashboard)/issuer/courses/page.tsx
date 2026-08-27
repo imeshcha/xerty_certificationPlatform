@@ -18,6 +18,7 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
+  Trash2,
 } from 'lucide-react';
 
 interface CourseRecord {
@@ -35,6 +36,7 @@ interface CourseRecord {
 export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
 
   // Load courses from backend or local cache
   useEffect(() => {
@@ -65,6 +67,35 @@ export default function CoursesPage() {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  const handleDeleteCourse = async (courseId: string, courseName: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const confirmed = window.confirm(`Are you sure you want to delete the course room "${courseName}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingCourseId(courseId);
+
+    try {
+      await fetchApi(`/courses/${courseId}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('Could not delete from remote backend directly, removing locally:', err);
+    }
+
+    // Update local state and storage
+    setCourses((prev) => {
+      const updated = prev.filter((c) => (c._id || c.id) !== courseId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xerty_courses', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    setDeletingCourseId(null);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6 max-w-5xl">
@@ -110,21 +141,35 @@ export default function CoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {courses.map((course) => {
-            const courseId = course._id || course.id;
+            const courseId = course._id || course.id || course.code;
+            const isDeleting = deletingCourseId === courseId;
+
             return (
               <Card
-                key={courseId || course.code}
-                className="border-border/60 hover:border-primary/50 transition-all flex flex-col justify-between"
+                key={courseId}
+                className="border-border/60 hover:border-primary/50 transition-all flex flex-col justify-between relative group"
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <span className="rounded bg-primary/10 px-2.5 py-0.5 text-xs font-mono font-bold text-primary">
                       {course.code}
                     </span>
-                    <span className="flex items-center text-xs text-muted-foreground font-medium">
-                      <Clock className="h-3.5 w-3.5 mr-1" />
-                      {course.durationHours} Hours
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center text-xs text-muted-foreground font-medium">
+                        <Clock className="h-3.5 w-3.5 mr-1" />
+                        {course.durationHours} Hours
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        title="Delete Course Room"
+                        disabled={isDeleting}
+                        onClick={(e) => handleDeleteCourse(courseId, course.title, e)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                   <Link href={`/issuer/courses/${courseId}`}>
                     <CardTitle className="text-base mt-2 hover:text-primary transition-colors cursor-pointer">

@@ -11,6 +11,7 @@ import {
   CertificateTemplateData,
 } from '../../../../../components/issuer/CertificateDesigner';
 import { CourseIssuanceModal } from '../../../../../components/issuer/CourseIssuanceModal';
+import { Trash2 } from 'lucide-react';
 
 export default function CourseRoomPage() {
   const params = useParams();
@@ -524,6 +525,58 @@ export default function CourseRoomPage() {
                 </Button>
               </div>
             </form>
+
+            {/* Danger Zone: Delete Course Room */}
+            <div className="mt-8 pt-6 border-t border-destructive/20 space-y-3">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold uppercase text-destructive flex items-center gap-1.5">
+                    <Trash2 className="h-3.5 w-3.5" /> Danger Zone: Delete Course Room
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Permanently deletes this course room, certificate template design, and cohort workspace.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs font-bold shrink-0 ml-4"
+                  onClick={async () => {
+                    const confirmed = window.confirm(
+                      `Are you sure you want to delete "${course.title}" (${course.code})? This action cannot be undone.`
+                    );
+                    if (!confirmed) return;
+
+                    try {
+                      await fetchApi(`/courses/${courseId}`, {
+                        method: 'DELETE',
+                      });
+                    } catch (e) {
+                      console.warn('Backend delete sync note:', e);
+                    }
+
+                    if (typeof window !== 'undefined') {
+                      try {
+                        const stored = localStorage.getItem('xerty_courses');
+                        if (stored) {
+                          const list = JSON.parse(stored);
+                          const updated = list.filter((c: any) => (c._id || c.id) !== courseId && c.code !== course.code);
+                          localStorage.setItem('xerty_courses', JSON.stringify(updated));
+                        }
+                      } catch (e) {
+                        console.warn('Failed to remove from local cache', e);
+                      }
+                    }
+
+                    router.push('/issuer/courses');
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Delete Course Room
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

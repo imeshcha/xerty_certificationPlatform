@@ -96,4 +96,13 @@ export class CoursesService {
     }
     return updated;
   }
+
+  async delete(id: string): Promise<{ success: boolean; message: string }> {
+    if (Types.ObjectId.isValid(id) && id.length === 24) {
+      await this.courseModel.findByIdAndDelete(id).exec();
+    } else {
+      await this.courseModel.deleteOne({ $or: [{ _id: id }, { code: id }] }).exec();
+    }
+    return { success: true, message: 'Course room deleted successfully' };
+  }
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto/create-course.dto';
@@ -41,5 +41,12 @@ export class CoursesController {
   @ApiResponse({ status: 200, description: 'Course updated successfully' })
   async updateCourse(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
     return this.coursesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete course room' })
+  @ApiResponse({ status: 200, description: 'Course deleted successfully' })
+  async deleteCourse(@Param('id') id: string) {
+    return this.coursesService.delete(id);
   }
 }
