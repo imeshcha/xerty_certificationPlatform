@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
-import { Building2, GraduationCap, ArrowRight, Check, Sparkles, ArrowUpRight } from 'lucide-react';
+import { Building2, GraduationCap, ArrowRight, Check, Sparkles, ShieldAlert, Lock } from 'lucide-react';
 import { fetchApi } from '../../../lib/api';
 
 export default function OnboardingPage() {
@@ -38,12 +38,33 @@ export default function OnboardingPage() {
     setErrorMessage('');
   };
 
-  const handleSkipStudent = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('xerty_user_role', 'STUDENT');
-      localStorage.setItem('xerty_onboarding_completed', 'true');
+  const handleSkipStudent = async () => {
+    setIsSubmitting(true);
+    try {
+      await fetchApi('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          privyUserId: user?.id || 'temp_user_id',
+          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          role: 'STUDENT',
+          email: user?.email?.address,
+        }),
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xerty_user_role', 'STUDENT');
+        localStorage.setItem('xerty_onboarding_completed', 'true');
+      }
+      router.push('/student');
+    } catch {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('xerty_user_role', 'STUDENT');
+        localStorage.setItem('xerty_onboarding_completed', 'true');
+      }
+      router.push('/student');
+    } finally {
+      setIsSubmitting(false);
     }
-    router.push('/student');
   };
 
   const handleIssuerSubmit = async (e: React.FormEvent) => {
@@ -56,6 +77,18 @@ export default function OnboardingPage() {
         issuerForm.slug ||
         issuerForm.academyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+      // 1. Sync role as ISSUER
+      await fetchApi('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          privyUserId: user?.id || 'temp_user_id',
+          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          role: 'ISSUER',
+          email: issuerForm.contactEmail || user?.email?.address,
+        }),
+      });
+
+      // 2. Create Issuer profile in MongoDB
       await fetchApi('/issuers/profile', {
         method: 'POST',
         body: JSON.stringify({
@@ -71,7 +104,7 @@ export default function OnboardingPage() {
         }),
       });
 
-      // Save role locally & route
+      // 3. Save role locally & route strictly to /issuer
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'ISSUER');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -96,6 +129,19 @@ export default function OnboardingPage() {
     setErrorMessage('');
 
     try {
+      // 1. Sync role as STUDENT
+      await fetchApi('/auth/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          privyUserId: user?.id || 'temp_user_id',
+          walletAddress: walletAddress || '0x0000000000000000000000000000000000000000',
+          role: 'STUDENT',
+          email: user?.email?.address,
+          fullName: studentForm.fullName,
+        }),
+      });
+
+      // 2. Create Student profile in MongoDB
       await fetchApi('/students/profile', {
         method: 'POST',
         body: JSON.stringify({
@@ -109,6 +155,7 @@ export default function OnboardingPage() {
         }),
       });
 
+      // 3. Save role locally & route strictly to /student
       if (typeof window !== 'undefined') {
         localStorage.setItem('xerty_user_role', 'STUDENT');
         localStorage.setItem('xerty_onboarding_completed', 'true');
@@ -135,19 +182,35 @@ export default function OnboardingPage() {
           <Sparkles className="h-3.5 w-3.5" />
           Welcome to Xerty
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Select Account Type</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Select Permanent Account Type</h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Choose whether you are an Educational Institution issuing credentials or a Student viewing credentials.
+          Please choose your account type carefully. Your account permissions are locked to your choice.
         </p>
+      </div>
+
+      {/* Strict Role Separation Notice Banner */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3 text-xs">
+        <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-bold text-foreground">Strict Role Separation Policy:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+            <li>
+              <strong>Issuer Account:</strong> For Educational Institutions. You will manage courses and issue diplomas. You <u>cannot</u> access or create a student vault.
+            </li>
+            <li>
+              <strong>Student Account:</strong> For Learners and Recipients. You will claim and verify credentials. You <u>cannot</u> access or create an issuer portal.
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* Step 1: Role Selection Cards */}
       {!selectedRole && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           {/* Issuer Option */}
           <Card
             onClick={() => handleRoleSelection('ISSUER')}
-            className="cursor-pointer hover:border-primary transition-all hover:shadow-lg relative overflow-hidden group"
+            className="cursor-pointer hover:border-primary transition-all hover:shadow-lg relative overflow-hidden group border-2"
           >
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="space-y-3">
@@ -157,7 +220,9 @@ export default function OnboardingPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl">Institution / Issuer</CardTitle>
-                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-primary/15 text-primary">Mandatory</span>
+                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-primary/15 text-primary flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Issuer Only
+                  </span>
                 </div>
                 <CardDescription className="text-xs mt-1">
                   For Academies, Universities, Bootcamps, and Organizations
@@ -168,22 +233,22 @@ export default function OnboardingPage() {
               <ul className="text-xs text-muted-foreground space-y-2">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Create academic courses & curricula
+                  Create academic course rooms & curricula
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Design & upload certificate templates
+                  Design & edit custom certificate templates
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Issue single or bulk CSV credentials
+                  Issue single or batch CSV credentials
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  On-chain revocation management
+                  Generate unified batch claim links
                 </li>
               </ul>
-              <Button className="w-full mt-2" variant="outline">
+              <Button className="w-full mt-2" variant="default">
                 Register as Issuer
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -193,7 +258,7 @@ export default function OnboardingPage() {
           {/* Student Option */}
           <Card
             onClick={() => handleRoleSelection('STUDENT')}
-            className="cursor-pointer hover:border-emerald-500 transition-all hover:shadow-lg relative overflow-hidden group"
+            className="cursor-pointer hover:border-emerald-500 transition-all hover:shadow-lg relative overflow-hidden group border-2"
           >
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             <CardHeader className="space-y-3">
@@ -203,7 +268,9 @@ export default function OnboardingPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl">Student / Recipient</CardTitle>
-                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-500">Optional</span>
+                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-500 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Student Only
+                  </span>
                 </div>
                 <CardDescription className="text-xs mt-1">
                   View, claim, download, and share your Soulbound tokens
@@ -214,24 +281,24 @@ export default function OnboardingPage() {
               <ul className="text-xs text-muted-foreground space-y-2">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Zero account required to view & verify
+                  Hold credentials in personal student vault
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  1-click claim credentials by email
+                  1-click claim credentials via email or wallet
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Add credentials directly to LinkedIn
+                  Add verified badges directly to LinkedIn
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
-                  Download PDF & verified on-chain proofs
+                  Download verifiable on-chain proofs & PDF
                 </li>
               </ul>
               <div className="space-y-2 pt-2">
                 <Button className="w-full" variant="outline">
-                  Setup Student Profile
+                  Register as Student
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <Button
@@ -242,9 +309,9 @@ export default function OnboardingPage() {
                   className="w-full text-xs text-muted-foreground hover:text-foreground"
                   variant="ghost"
                   size="sm"
+                  disabled={isSubmitting}
                 >
-                  Skip & Go Directly to Vault
-                  <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+                  Quick Setup & Go to Vault →
                 </Button>
               </div>
             </CardContent>
@@ -254,15 +321,15 @@ export default function OnboardingPage() {
 
       {/* Step 2: Form for Issuer */}
       {selectedRole === 'ISSUER' && (
-        <Card className="max-w-xl mx-auto">
+        <Card className="max-w-xl mx-auto border-2 border-primary/40">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Institution Profile Setup (Mandatory)</CardTitle>
+                <CardTitle className="text-lg">Institution Account Setup</CardTitle>
                 <CardDescription>Enter details about your academy or organization.</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedRole(null)}>
-                Change Role
+                Change
               </Button>
             </div>
           </CardHeader>
@@ -339,7 +406,7 @@ export default function OnboardingPage() {
 
               <div className="pt-2">
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating Profile...' : 'Complete Issuer Registration'}
+                  {isSubmitting ? 'Creating Issuer Profile...' : 'Confirm & Register as Issuer'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -348,17 +415,17 @@ export default function OnboardingPage() {
         </Card>
       )}
 
-      {/* Step 2: Form for Student (Optional) */}
+      {/* Step 2: Form for Student */}
       {selectedRole === 'STUDENT' && (
-        <Card className="max-w-xl mx-auto">
+        <Card className="max-w-xl mx-auto border-2 border-emerald-500/40">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Student Profile Setup (Optional)</CardTitle>
-                <CardDescription>Personalize your portfolio, or skip directly to your vault.</CardDescription>
+                <CardTitle className="text-lg">Student Profile Setup</CardTitle>
+                <CardDescription>Personalize your recipient portfolio.</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedRole(null)}>
-                Change Role
+                Change
               </Button>
             </div>
           </CardHeader>
@@ -417,11 +484,12 @@ export default function OnboardingPage() {
                   variant="ghost"
                   size="sm"
                   onClick={handleSkipStudent}
+                  disabled={isSubmitting}
                 >
-                  Skip Setup
+                  Skip Customization
                 </Button>
                 <Button type="submit" size="sm" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving Profile...' : 'Save Student Profile'}
+                  {isSubmitting ? 'Saving...' : 'Confirm & Register as Student'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>

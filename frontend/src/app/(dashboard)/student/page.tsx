@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -34,7 +35,14 @@ interface StudentCertificate {
 }
 
 export default function StudentDashboardPage() {
-  const { user, walletAddress } = useAuth();
+  const router = useRouter();
+  const { user, walletAddress, userRole, isReady, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isReady && isAuthenticated && userRole === 'ISSUER') {
+      router.push('/issuer');
+    }
+  }, [isReady, isAuthenticated, userRole, router]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);

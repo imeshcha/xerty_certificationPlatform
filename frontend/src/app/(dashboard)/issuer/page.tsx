@@ -2,14 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { fetchApi } from '../../../lib/api';
-import { Award, BookOpen, Layers, PlusCircle, Upload, CheckCircle2, History, ArrowRight } from 'lucide-react';
+import { Award, BookOpen, Layers, PlusCircle, Upload, CheckCircle2, History, ArrowRight, ShieldAlert } from 'lucide-react';
 
 export default function IssuerDashboardPage() {
+  const router = useRouter();
+  const { userRole, isReady, isAuthenticated } = useAuth();
   const [issuedCount, setIssuedCount] = useState<number>(0);
   const [coursesCount, setCoursesCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (isReady && isAuthenticated && userRole === 'STUDENT') {
+      router.push('/student');
+    }
+  }, [isReady, isAuthenticated, userRole, router]);
 
   useEffect(() => {
     fetchApi('/certificates')

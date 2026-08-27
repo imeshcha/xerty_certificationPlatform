@@ -62,7 +62,7 @@ export function useAuth() {
     }
   }, []);
 
-  // 2. Synchronize user with MongoDB Atlas on login (run once per authenticated session)
+  // 2. Synchronize user with MongoDB Atlas on login
   useEffect(() => {
     async function syncUserWithBackend() {
       if (ready && authenticated && user?.wallet?.address) {
@@ -90,36 +90,30 @@ export function useAuth() {
 
           if (typeof window !== 'undefined') {
             const hasIssuerProfile = !!dbUser?.issuerProfile?.academyName;
-            const hasStudentProfile = !!dbUser?.studentProfile?.bio || !!dbUser?.studentProfile?.headline;
-            const isIssuer = dbUser?.role === 'ISSUER' || hasIssuerProfile;
-            const isStudent = dbUser?.role === 'STUDENT' && hasStudentProfile;
+            const hasStudentProfile = !!dbUser?.studentProfile?.fullName || !!dbUser?.studentProfile?.headline;
+            const isStrictIssuer = dbUser?.role === 'ISSUER' || hasIssuerProfile;
+            const isStrictStudent = (dbUser?.role === 'STUDENT' && hasStudentProfile) || (!isStrictIssuer && hasStudentProfile);
 
-            if (isIssuer) {
+            if (isStrictIssuer) {
               setUserRole('ISSUER');
               localStorage.setItem('xerty_user_role', 'ISSUER');
               localStorage.setItem('xerty_onboarding_completed', 'true');
 
-              // Only auto-redirect once upon initial login or from onboarding
-              if (!hasAutoRedirected.current && pathname === '/onboarding') {
-                hasAutoRedirected.current = true;
+              if (pathname === '/onboarding') {
                 router.push('/issuer');
               }
-            } else if (isStudent) {
+            } else if (isStrictStudent) {
               setUserRole('STUDENT');
               localStorage.setItem('xerty_user_role', 'STUDENT');
               localStorage.setItem('xerty_onboarding_completed', 'true');
 
-              if (!hasAutoRedirected.current && pathname === '/onboarding') {
-                hasAutoRedirected.current = true;
+              if (pathname === '/onboarding') {
                 router.push('/student');
               }
             } else {
-              // Brand new un-onboarded user
-              const localRole = localStorage.getItem('xerty_user_role');
-              if (localRole === 'ISSUER') {
-                setUserRole('ISSUER');
-              } else if (localRole === 'STUDENT') {
-                setUserRole('STUDENT');
+              // Brand new user without completed onboarding: Redirect to onboarding to select Issuer or Student
+              if (pathname.startsWith('/issuer') || pathname.startsWith('/student')) {
+                router.push('/onboarding');
               }
             }
           }
@@ -141,6 +135,19 @@ export function useAuth() {
       syncUserWithBackend();
     }
   }, [ready, authenticated, user?.wallet?.address, user?.id]);
+
+  // 3. Strict Route Enforcement: Issuers CANNOT enter /student, Students CANNOT enter /issuer
+  useEffect(() => {
+    if (ready && authenticated && userRole) {
+      if (userRole === 'ISSUER' && pathname.startsWith('/student')) {
+        console.warn('Access denied: Issuer accounts cannot access student vault.');
+        router.push('/issuer');
+      } else if (userRole === 'STUDENT' && pathname.startsWith('/issuer')) {
+        console.warn('Access denied: Student accounts cannot access issuer studio.');
+        router.push('/student');
+      }
+    }
+  }, [ready, authenticated, userRole, pathname]);
 
   return {
     isReady: ready,
