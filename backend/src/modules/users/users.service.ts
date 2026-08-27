@@ -113,7 +113,7 @@ export class UsersService {
 
     let user = await this.userModel.findOne(query).exec();
 
-    if (user && user.isRoleLocked && user.role !== UserRole.UNASSIGNED && user.role !== role) {
+    if (user && user.isRoleLocked && user.isProfileComplete && user.role !== UserRole.UNASSIGNED && user.role !== role) {
       throw new ForbiddenException(
         `Strict Access Policy: An account registered as ${user.role} cannot create or access a ${role} account.`
       );
