@@ -84,6 +84,9 @@ export class User {
   @Prop({ required: true, enum: UserRole, default: UserRole.STUDENT, index: true })
   role: string;
 
+  @Prop({ default: false })
+  isRoleLocked: boolean;
+
   @Prop({ trim: true })
   fullName?: string;
 

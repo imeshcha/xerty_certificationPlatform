@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
@@ -74,6 +74,13 @@ export class UsersService {
       if (!existing.fullName && userData.fullName) existing.fullName = userData.fullName;
       if (userData.privyUserId) existing.privyUserId = userData.privyUserId;
       if (walletAddress) existing.walletAddress = walletAddress.toLowerCase();
+
+      // If user provided a specific role and the existing role is not locked yet, lock it
+      if (userData.role && !existing.isRoleLocked) {
+        existing.role = userData.role;
+        existing.isRoleLocked = true;
+      }
+
       return existing.save();
     }
 
@@ -83,6 +90,7 @@ export class UsersService {
       walletAddress: walletAddress?.toLowerCase(),
       solanaAddress,
       role: userData.role || UserRole.STUDENT,
+      isRoleLocked: !!userData.role,
     });
   }
 
@@ -105,12 +113,18 @@ export class UsersService {
           ],
         };
 
+    const existingUser = await this.userModel.findOne(query).exec();
+    if (existingUser && existingUser.isRoleLocked && existingUser.role === UserRole.STUDENT) {
+      throw new ForbiddenException('Strict Access: Student accounts cannot create an Issuer profile or access the Issuer portal.');
+    }
+
     const updated = await this.userModel
       .findOneAndUpdate(
         query,
         {
           $set: {
             role: UserRole.ISSUER,
+            isRoleLocked: true,
             issuerProfile: {
               ...profileData,
               isVerified: false,
@@ -147,8 +161,14 @@ export class UsersService {
           ],
         };
 
+    const existingUser = await this.userModel.findOne(query).exec();
+    if (existingUser && existingUser.isRoleLocked && existingUser.role === UserRole.ISSUER) {
+      throw new ForbiddenException('Strict Access: Issuer accounts cannot create a Student profile.');
+    }
+
     const updatePayload: any = {
       role: UserRole.STUDENT,
+      isRoleLocked: true,
       studentProfile: profileData,
     };
     if (profileData.fullName) {
