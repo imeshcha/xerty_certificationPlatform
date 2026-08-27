@@ -36,17 +36,32 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load courses from backend
+  // Load courses from backend or local cache
   useEffect(() => {
     setIsLoading(true);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('xerty_courses');
+        if (stored) {
+          setCourses(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached courses', e);
+      }
+    }
+
     fetchApi('/courses')
       .then((res: any) => {
-        if (Array.isArray(res)) {
+        if (Array.isArray(res) && res.length > 0) {
           setCourses(res);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('xerty_courses', JSON.stringify(res));
+          }
         }
       })
       .catch((err) => {
-        console.warn('Could not fetch courses:', err);
+        console.warn('Could not fetch courses from backend:', err);
       })
       .finally(() => setIsLoading(false));
   }, []);

@@ -17,9 +17,13 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // Security Middleware
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+    }),
+  );
   app.enableCors({
-    origin: '*',
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
