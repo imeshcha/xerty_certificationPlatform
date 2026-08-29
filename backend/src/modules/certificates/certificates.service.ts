@@ -158,9 +158,19 @@ export class CertificatesService {
       .exec();
   }
 
-  async findByCertificateId(certificateId: string): Promise<CertificateDocument> {
+  async findByCertificateId(identifier: string): Promise<CertificateDocument> {
+    const clean = identifier.trim();
     const cert = await this.certModel
-      .findOne({ certificateId })
+      .findOne({
+        $or: [
+          { certificateId: clean.toUpperCase() },
+          { certificateId: clean },
+          { transactionHash: clean.toLowerCase() },
+          { transactionHash: clean },
+          { solanaSignature: clean },
+          { certificateHash: clean.toLowerCase() },
+        ],
+      })
       .populate('issuerId')
       .populate('courseId')
       .populate('templateId')

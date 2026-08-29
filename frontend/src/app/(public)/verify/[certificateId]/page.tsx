@@ -46,7 +46,7 @@ interface VerificationData {
 export default function CertificateVerificationResultPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const certId = (params.certificateId as string || '').toUpperCase();
+  const certId = (params.certificateId as string || '').trim();
   const isClaimIntent = searchParams.get('claim') === 'true';
 
   const { isAuthenticated, user, login } = useAuth();
@@ -361,9 +361,44 @@ export default function CertificateVerificationResultPage() {
               </div>
 
               {/* On-Chain & IPFS Proofs */}
-              <div className="space-y-2 pt-1">
-                <p className="text-xs uppercase font-semibold text-muted-foreground">Decentralized Multi-Chain Proofs</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-3 pt-2">
+                <p className="text-xs uppercase font-semibold text-muted-foreground">Decentralized On-Chain Proofs</p>
+                
+                {data.transactionHash && (
+                  <div className="p-3 rounded-lg border bg-muted/20 space-y-1 font-mono text-xs">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Arbitrum NFT Transaction Hash</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-primary truncate font-semibold">{data.transactionHash}</span>
+                      <a
+                        href={`https://sepolia.arbiscan.io/tx/${data.transactionHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-sans font-bold text-primary hover:underline shrink-0"
+                      >
+                        Arbiscan ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {data.solanaSignature && (
+                  <div className="p-3 rounded-lg border bg-muted/20 space-y-1 font-mono text-xs">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Solana On-Chain Signature</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-purple-600 truncate font-semibold">{data.solanaSignature}</span>
+                      <a
+                        href={`https://explorer.solana.com/tx/${data.solanaSignature}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] font-sans font-bold text-purple-600 hover:underline shrink-0"
+                      >
+                        Solana Explorer ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-1">
                   {data.explorerUrl && (
                     <a href={data.explorerUrl} target="_blank" rel="noopener noreferrer">
                       <Button variant="outline" size="sm" className="text-xs font-mono">

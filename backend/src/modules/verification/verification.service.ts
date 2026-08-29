@@ -50,8 +50,8 @@ export class VerificationService {
   ) {}
 
   async verify(certificateId: string): Promise<VerificationResult> {
-    const cleanId = certificateId.trim().toUpperCase();
-    this.logger.log(`Verifying public certificate: ${cleanId}`);
+    const cleanId = certificateId.trim();
+    this.logger.log(`Verifying public certificate / tx: ${cleanId}`);
 
     const securityChecks = {
       dbRecordFound: false,

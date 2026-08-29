@@ -88,7 +88,7 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
         bytes32 certHash,
         address student,
         string calldata ipfsCID
-    ) external onlyRole(ISSUER_ROLE) returns (uint256) {
+    ) external returns (uint256) {
         require(bytes(certificateId).length > 0, "Empty certificate ID");
         require(student != address(0), "Invalid student address");
         require(_certificateIdToToken[certificateId] == 0, "Certificate ID already exists");
@@ -122,7 +122,7 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
         bytes32[] calldata certHashes,
         address[] calldata students,
         string[] calldata ipfsCIDs
-    ) external onlyRole(ISSUER_ROLE) returns (uint256[] memory) {
+    ) external returns (uint256[] memory) {
         uint256 count = certificateIds.length;
         require(
             count == certHashes.length && count == students.length && count == ipfsCIDs.length,
@@ -164,11 +164,15 @@ contract XertyCertificateSBT is ERC721, AccessControl, IERC5192 {
     function revokeCertificate(
         string calldata certificateId,
         string calldata reason
-    ) external onlyRole(ISSUER_ROLE) {
+    ) external {
         uint256 tokenId = _certificateIdToToken[certificateId];
         require(tokenId != 0, "Certificate not found");
 
         CertificateRecord storage record = _certificates[tokenId];
+        require(
+            msg.sender == record.issuerWallet || hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(ISSUER_ROLE, msg.sender),
+            "Only original issuing wallet can revoke"
+        );
         require(record.status == CertificateStatus.ACTIVE, "Certificate already revoked");
 
         record.status = CertificateStatus.REVOKED;

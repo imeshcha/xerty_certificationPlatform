@@ -13,13 +13,13 @@ export default function PublicVerifySearchPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = certIdInput.trim().toUpperCase();
+    const cleanId = certIdInput.trim();
     if (!cleanId) {
-      setError('Please enter a valid Certificate ID');
+      setError('Please enter a valid Certificate ID or Transaction Hash');
       return;
     }
     setError('');
-    router.push(`/verify/${cleanId}`);
+    router.push(`/verify/${encodeURIComponent(cleanId)}`);
   };
 
   return (
@@ -34,16 +34,16 @@ export default function PublicVerifySearchPage() {
           Verify Any Certificate in Real-Time
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Zero login required. Instantly validate cryptographic proof, issuer identity, and active revocation status on Arbitrum Sepolia.
+          Zero login required. Instantly validate cryptographic proof, issuer identity, and active on-chain status on Arbitrum Sepolia & Solana Devnet.
         </p>
       </div>
 
       {/* Search Box */}
       <Card className="border-border/80 shadow-lg bg-card/60 backdrop-blur-sm max-w-2xl mx-auto">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg">Enter Certificate ID</CardTitle>
+          <CardTitle className="text-lg">Enter Certificate ID or NFT Transaction Hash</CardTitle>
           <CardDescription className="text-xs">
-            Located at the bottom of official credentials (e.g. <code>XERTY-2026-A49F1B</code>)
+            Search by Certificate ID (e.g. <code>XERTY-2026-001A-XYZ</code>) or On-Chain Transaction Hash (<code>0x...</code> / Solana Signature)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -52,8 +52,8 @@ export default function PublicVerifySearchPage() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input
                 type="text"
-                className="w-full rounded-lg border bg-background pl-11 pr-4 py-3 text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-primary uppercase"
-                placeholder="e.g. XERTY-2026-A49F1B"
+                className="w-full rounded-lg border bg-background pl-11 pr-4 py-3 text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="e.g. XERTY-2026-A49F1B or 0x4f2a9..."
                 value={certIdInput}
                 onChange={(e) => {
                   setCertIdInput(e.target.value);
