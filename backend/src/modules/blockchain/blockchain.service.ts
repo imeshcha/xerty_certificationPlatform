@@ -74,15 +74,18 @@ export class BlockchainService {
   ): Promise<{ success: boolean; txHash?: string; error?: string }> {
     try {
       if (!this.relayerWallet || !this.contractAddress || this.contractAddress === '0x0000000000000000000000000000000000000000') {
-        const mockHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-        return { success: true, txHash: mockHash };
+        return {
+          success: false,
+          error: 'Arbitrum Sepolia contract address or relayer wallet is not configured. Please use Direct Issuer Wallet (MetaMask) or configure CONTRACT_ADDRESS in .env',
+        };
       }
 
       const balance = await this.provider.getBalance(this.relayerWallet.address);
       if (balance === 0n) {
-        this.logger.warn(`Relayer ${this.relayerWallet.address} has 0 testnet ETH; fallback hash generated`);
-        const mockHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-        return { success: true, txHash: mockHash };
+        return {
+          success: false,
+          error: `Relayer wallet ${this.relayerWallet.address} has 0 testnet ETH on Arbitrum Sepolia. Please fund the relayer from an Arbitrum Sepolia faucet or issue using Direct Issuer Wallet (MetaMask).`,
+        };
       }
 
       const contract = new ethers.Contract(this.contractAddress, XERTY_SBT_ABI, this.relayerWallet);
@@ -102,8 +105,7 @@ export class BlockchainService {
       return { success: true, txHash: tx.hash };
     } catch (err: any) {
       this.logger.error(`On-chain issuance error: ${err.message}`);
-      const mockHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
-      return { success: false, txHash: mockHash, error: err.message };
+      return { success: false, error: err.message };
     }
   }
 

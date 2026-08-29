@@ -124,12 +124,11 @@ export class SolanaService {
         explorerUrl: this.getExplorerUrl(signature),
       };
     } catch (err: any) {
-      this.logger.warn(`Solana on-chain issuance note: ${err.message}`);
-      const mockSig = `${Array.from({ length: 88 }, () => '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random() * 58)]).join('')}`;
+      this.logger.error(`Solana on-chain issuance error: ${err.message}`);
       return {
-        success: true,
-        signature: mockSig,
-        explorerUrl: this.getExplorerUrl(mockSig),
+        success: false,
+        signature: '',
+        explorerUrl: '',
         error: err.message,
       };
     }

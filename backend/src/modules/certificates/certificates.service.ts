@@ -228,22 +228,28 @@ export class CertificatesService {
     let txHash = dto.transactionHash;
     let solSignature = dto.solanaSignature;
 
-    if (dto.network === 'SOLANA_DEVNET') {
-      const solRes = await this.solanaService.issueCertificateOnSolana(
-        dto.certificateId,
-        dto.certificateHash,
-        dto.studentWallet || '',
-        dto.ipfsCID,
-      );
-      solSignature = solRes.signature;
-    } else {
-      const arbRes = await this.blockchainService.issueCertificateOnChain(
-        dto.certificateId,
-        dto.certificateHash,
-        dto.studentWallet || '',
-        dto.ipfsCID,
-      );
-      txHash = arbRes.txHash;
+    if (!txHash && !solSignature) {
+      if (dto.network === 'SOLANA_DEVNET') {
+        const solRes = await this.solanaService.issueCertificateOnSolana(
+          dto.certificateId,
+          dto.certificateHash,
+          dto.studentWallet || '',
+          dto.ipfsCID,
+        );
+        if (solRes.success && solRes.signature) {
+          solSignature = solRes.signature;
+        }
+      } else {
+        const arbRes = await this.blockchainService.issueCertificateOnChain(
+          dto.certificateId,
+          dto.certificateHash,
+          dto.studentWallet || '',
+          dto.ipfsCID,
+        );
+        if (arbRes.success && arbRes.txHash) {
+          txHash = arbRes.txHash;
+        }
+      }
     }
 
     const newCert = new this.certModel({
@@ -269,22 +275,28 @@ export class CertificatesService {
         let txHash = dto.transactionHash;
         let solSignature = dto.solanaSignature;
 
-        if (dto.network === 'SOLANA_DEVNET') {
-          const solRes = await this.solanaService.issueCertificateOnSolana(
-            dto.certificateId,
-            dto.certificateHash,
-            dto.studentWallet || '',
-            dto.ipfsCID,
-          );
-          solSignature = solRes.signature;
-        } else {
-          const arbRes = await this.blockchainService.issueCertificateOnChain(
-            dto.certificateId,
-            dto.certificateHash,
-            dto.studentWallet || '',
-            dto.ipfsCID,
-          );
-          txHash = arbRes.txHash;
+        if (!txHash && !solSignature) {
+          if (dto.network === 'SOLANA_DEVNET') {
+            const solRes = await this.solanaService.issueCertificateOnSolana(
+              dto.certificateId,
+              dto.certificateHash,
+              dto.studentWallet || '',
+              dto.ipfsCID,
+            );
+            if (solRes.success && solRes.signature) {
+              solSignature = solRes.signature;
+            }
+          } else {
+            const arbRes = await this.blockchainService.issueCertificateOnChain(
+              dto.certificateId,
+              dto.certificateHash,
+              dto.studentWallet || '',
+              dto.ipfsCID,
+            );
+            if (arbRes.success && arbRes.txHash) {
+              txHash = arbRes.txHash;
+            }
+          }
         }
 
         return {
