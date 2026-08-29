@@ -98,11 +98,11 @@ export default function CertificateVerificationResultPage() {
           issueDate: new Date().toISOString(),
           grade: 'Distinction',
           score: 98.5,
-          transactionHash: isSolana ? undefined : '0x3a1b2c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
+          transactionHash: undefined,
           solanaSignature: isSolana ? '5UfDfvS8o8hRkZ8FvN92bY4kLsV3Q7tP1wM2xN8rT6yU4iO9pA3sD5fG7hJ1kL' : undefined,
           explorerUrl: isSolana
             ? 'https://explorer.solana.com/tx/5UfDfvS8o8hRkZ8FvN92bY4kLsV3Q7tP1wM2xN8rT6yU4iO9pA3sD5fG7hJ1kL?cluster=devnet'
-            : 'https://sepolia.arbiscan.io/tx/0x3a1b2c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
+            : undefined,
           ipfsMetadataUrl: 'https://gateway.pinata.cloud/ipfs/QmSampleMetadataCID1234567890abcdef',
           certificateHash: '0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
           variablesMap: {
